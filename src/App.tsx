@@ -12,6 +12,7 @@ import Competencies from "./pages/Competencies";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import AppLayout from "./components/AppLayout";
 
 const queryClient = new QueryClient();
@@ -79,9 +80,11 @@ const App = () => (
             path="/analytics"
             element={
               <ProtectedRoute>
-                <AppLayout>
-                  <Analytics />
-                </AppLayout>
+                <RoleProtectedRoute requiredRole="manager">
+                  <AppLayout>
+                    <Analytics />
+                  </AppLayout>
+                </RoleProtectedRoute>
               </ProtectedRoute>
             }
           />
