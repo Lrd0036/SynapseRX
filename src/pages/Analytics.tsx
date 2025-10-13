@@ -8,17 +8,12 @@ import { UserEnrollmentList } from "@/components/UserEnrollmentList";
 import { Database } from "@/integrations/supabase/types";
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type UserMetric = Database['public']['Tables']['user_metrics']['Row'];
-type ModuleResponseWithDetails = Database['public']['Tables']['module_responses']['Row'] & {
-  profiles: { full_name: string } | null;
-  training_modules: { title: string } | null;
-};
 
 export const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [technicians, setTechnicians] = useState<Profile[]>([]);
   const [metrics, setMetrics] = useState<UserMetric[]>([]);
-  const [responses, setResponses] = useState<ModuleResponseWithDetails[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,19 +21,28 @@ export const Analytics = () => {
         setLoading(true);
         setError(null);
         
-        const [techniciansRes, metricsRes, responsesRes] = await Promise.all([
-          supabase.from('user_roles').select('profiles:user_id(*)').eq('role', 'technician'),
-          supabase.from('user_metrics').select('*'),
-          supabase.from('module_responses').select('*, profiles:user_id(full_name), training_modules:module_id(title)'),
+        // First, get all technician user IDs
+        const { data: techRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'technician');
+        
+        if (rolesError) throw new Error(`User roles: ${rolesError.message}`);
+        
+        const technicianIds = techRoles?.map(r => r.user_id) || [];
+        
+        // Fetch technicians and their metrics in parallel
+        const [techniciansRes, metricsRes] = await Promise.all([
+          supabase.from('profiles').select('*').in('id', technicianIds),
+          supabase.from('user_metrics').select('*').in('user_id', technicianIds),
         ]);
 
         if (techniciansRes.error) throw new Error(`Technicians: ${techniciansRes.error.message}`);
         if (metricsRes.error) throw new Error(`Metrics: ${metricsRes.error.message}`);
-        if (responsesRes.error) throw new Error(`Responses: ${responsesRes.error.message}`);
         
-        setTechnicians((techniciansRes.data?.map(t => t.profiles).filter(Boolean) as Profile[]) || []);
+        // Update state with fetched data
+        setTechnicians(techniciansRes.data || []);
         setMetrics(metricsRes.data || []);
-        setResponses((responsesRes.data as ModuleResponseWithDetails[]) || []);
 
       } catch (err: any) {
         setError(err.message);
@@ -88,7 +92,7 @@ export const Analytics = () => {
 
       <UserEnrollmentList users={technicians} metrics={metrics} />
       
-      <ResponsesView responses={responses} />
+      <ResponsesView />
     </div>
   );
 };
