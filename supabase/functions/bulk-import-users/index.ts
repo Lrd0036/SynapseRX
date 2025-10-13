@@ -48,76 +48,103 @@ serve(async (req) => {
         // Destructure required fields from the row.
         const { FirstName, LastName, Email, Password, AccuracyRate, ProgressPercent } = row;
 
-        // Ensure all required fields are present.
-        if (!Email || !Password || !FirstName || !LastName) {
-          results.errors.push({ email: Email, error: "Missing required fields" });
+        if (!Email || !FirstName || !LastName) {
+          results.errors.push({ email: Email, error: "Missing required fields (Email, FirstName, LastName)" });
           continue; // Skip to the next row.
         }
 
-        // Determine the user's role.
-        const role = Email.includes("manager") ? "manager" : "technician";
+        let userId: string;
+        let userExists = false;
 
-        // Step 1: Create the authentication user.
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: Email,
-          password: Password,
-          email_confirm: true, // Mark email as confirmed automatically.
-          user_metadata: {
-            full_name: `${FirstName} ${LastName}`,
-          },
-        });
+        // **UPSERT LOGIC START**
+        // Step 1: Check if the user already exists in auth.users.
+        const { data: existingUserData, error: existingUserError } =
+          await supabaseAdmin.auth.admin.getUserByEmail(Email);
 
-        if (authError) {
-          results.errors.push({ email: Email, error: authError.message });
-          continue;
+        if (existingUserError && existingUserError.message !== "User not found") {
+          throw existingUserError;
         }
 
-        // **CRITICAL FIX**: Get the user ID from the successful auth creation.
-        const userId = authData.user.id;
+        if (existingUserData?.user) {
+          // User exists, so we get their ID for updating.
+          userId = existingUserData.user.id;
+          userExists = true;
+        } else {
+          // User does not exist, so we create them.
+          if (!Password) {
+            results.errors.push({ email: Email, error: "Missing password for new user." });
+            continue;
+          }
 
-        // Step 2: Create the corresponding public data records.
-        // Create a profile record.
-        const { error: profileError } = await supabaseAdmin.from("profiles").insert({
-          id: userId,
-          full_name: `${FirstName} ${LastName}`,
-          email: Email,
-        });
+          const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: Email,
+            password: Password,
+            email_confirm: true,
+            user_metadata: {
+              full_name: `${FirstName} ${LastName}`,
+            },
+          });
+
+          if (authError) {
+            results.errors.push({ email: Email, error: `Auth creation: ${authError.message}` });
+            continue;
+          }
+          userId = authData.user.id;
+        }
+
+        // Step 2: Use .upsert() to insert or update the public data.
+        // The `onConflict` option tells Supabase to update if a record with the same primary key (id/user_id) exists.
+
+        // Upsert the profile record.
+        const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
+          {
+            id: userId,
+            full_name: `${FirstName} ${LastName}`,
+            email: Email,
+          },
+          { onConflict: "id" },
+        );
 
         if (profileError) {
-          results.errors.push({ email: Email, error: `Profile Error: ${profileError.message}` });
+          results.errors.push({ email: Email, error: `Profile upsert: ${profileError.message}` });
           continue;
         }
 
-        // Create a user role record.
-        const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
-          user_id: userId,
-          role: role,
-        });
+        // Determine role and upsert it.
+        const role = Email.includes("manager") ? "manager" : "technician";
+        const { error: roleError } = await supabaseAdmin.from("user_roles").upsert(
+          {
+            user_id: userId,
+            role: role,
+          },
+          { onConflict: "user_id" },
+        ); // Use user_id as the conflict target
 
         if (roleError) {
-          results.errors.push({ email: Email, error: `Role Error: ${roleError.message}` });
+          results.errors.push({ email: Email, error: `Role upsert: ${roleError.message}` });
           continue;
         }
 
-        // Create a user metrics record.
-        const { error: metricsError } = await supabaseAdmin.from("user_metrics").insert({
-          user_id: userId,
-          accuracy_rate: parseFloat(AccuracyRate) || 0,
-          progress_percent: parseInt(ProgressPercent) || 0,
-        });
+        // Upsert the user metrics record.
+        const { error: metricsError } = await supabaseAdmin.from("user_metrics").upsert(
+          {
+            user_id: userId,
+            accuracy_rate: parseFloat(AccuracyRate) || 0,
+            progress_percent: parseInt(ProgressPercent) || 0,
+          },
+          { onConflict: "user_id" },
+        ); // Use user_id as the conflict target
 
         if (metricsError) {
-          results.errors.push({ email: Email, error: `Metrics Error: ${metricsError.message}` });
+          results.errors.push({ email: Email, error: `Metrics upsert: ${metricsError.message}` });
           continue;
         }
 
-        // If all steps succeed, log it and add to the success array.
-        results.success.push({ email: Email, role });
-        console.log(`Successfully created and configured user: ${Email}`);
+        results.success.push({ email: Email, role, action: userExists ? "updated" : "created" });
       } catch (err) {
         results.errors.push({
           email: row.Email,
-          error: err instanceof Error ? err.message : "An unknown error occurred",
+          error: err instanceof Error ? err.message : "An unknown error occurred during row processing.",
         });
       }
     }
