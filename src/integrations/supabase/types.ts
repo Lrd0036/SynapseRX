@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      certifications: {
+        Row: {
+          certification_name: string
+          created_at: string
+          expiration_date: string
+          id: string
+          issue_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          certification_name: string
+          created_at?: string
+          expiration_date: string
+          id?: string
+          issue_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          certification_name?: string
+          created_at?: string
+          expiration_date?: string
+          id?: string
+          issue_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       competency_records: {
         Row: {
           assessed_at: string

@@ -10,6 +10,7 @@ import ModuleDetail from "./pages/ModuleDetail";
 import Consultation from "./pages/Consultation";
 import Competencies from "./pages/Competencies";
 import Analytics from "./pages/Analytics";
+import Insights from "./pages/Insights";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
@@ -83,6 +84,18 @@ const App = () => (
                 <RoleProtectedRoute requiredRole="manager">
                   <AppLayout>
                     <Analytics />
+                  </AppLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="manager">
+                  <AppLayout>
+                    <Insights />
                   </AppLayout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

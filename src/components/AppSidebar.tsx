@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Activity, BookOpen, MessageSquare, BarChart3, Award, LogOut } from "lucide-react";
+import { Activity, BookOpen, MessageSquare, BarChart3, Award, LogOut, Lightbulb } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +25,7 @@ const technicianItems = [
 
 const managerItems = [
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Insights", url: "/insights", icon: Lightbulb },
 ];
 
 export function AppSidebar() {
