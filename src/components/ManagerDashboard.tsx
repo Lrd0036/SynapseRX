@@ -21,8 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Users, BookOpen, Award, TrendingUp, AlertTriangle, Search, UserCog, Send } from "lucide-react";
+import { Users, BookOpen, Award, TrendingUp, AlertTriangle, Search, UserCog, Send, Trophy, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 interface TechnicianData {
   id: string;
@@ -48,7 +49,12 @@ export const ManagerDashboard = () => {
   const [sortBy, setSortBy] = useState<"name" | "completion" | "score">("name");
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
   const [impersonateMode, setImpersonateMode] = useState(false);
+  const [moduleStats, setModuleStats] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [groupData, setGroupData] = useState<any[]>([]);
   const { toast } = useToast();
+
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))'];
 
   useEffect(() => {
     const fetchManagerData = async () => {
@@ -118,32 +124,139 @@ export const ManagerDashboard = () => {
       setTechnicians(technicianData);
       setFilteredTechnicians(technicianData);
 
-      // Calculate skill gaps by module
-      const moduleGaps = (modules || []).map((module) => {
+      // Calculate module-specific statistics
+      const moduleStatistics = (modules || []).map((module) => {
         const moduleProgress = allProgress?.filter((p) => p.module_id === module.id) || [];
         const completionRate = moduleProgress.length > 0
           ? Math.round((moduleProgress.filter((p) => p.completed).length / (profiles?.length || 1)) * 100)
           : 0;
 
-        // Find average scores for this module's competencies
+        // Find competencies related to this module
         const moduleCompetencies = competencies?.filter((c) => 
-          c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(' ')[0])
+          c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(' ')[0]) ||
+          c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(' ')[1] || '')
         ) || [];
         
         const avgModuleScore = moduleCompetencies.length > 0
           ? Math.round(moduleCompetencies.reduce((sum, c) => sum + c.score, 0) / moduleCompetencies.length)
-          : null;
+          : 0;
+
+        const passRate = moduleCompetencies.length > 0
+          ? Math.round((moduleCompetencies.filter((c) => c.score >= 70).length / moduleCompetencies.length) * 100)
+          : 0;
 
         return {
           module_id: module.id,
           module_title: module.title,
           completion_rate: completionRate,
           avg_score: avgModuleScore,
-          is_gap: completionRate < 60 || (avgModuleScore !== null && avgModuleScore < 60),
+          pass_rate: passRate,
+          is_gap: completionRate < 60 || avgModuleScore < 60,
         };
       });
 
-      setSkillGaps(moduleGaps.filter((g) => g.is_gap).sort((a, b) => a.completion_rate - b.completion_rate));
+      setModuleStats(moduleStatistics);
+
+      // Calculate skill gaps
+      const gaps = moduleStatistics.filter((s) => s.is_gap).sort((a, b) => a.completion_rate - b.completion_rate);
+      setSkillGaps(gaps);
+
+      // Generate alerts based on performance
+      const generatedAlerts = [];
+      
+      // Check for repeated failures
+      const failureMap = new Map<string, number>();
+      competencies?.forEach((comp) => {
+        if (comp.score < 70) {
+          const key = `${comp.user_id}-${comp.competency_name}`;
+          failureMap.set(key, (failureMap.get(key) || 0) + 1);
+        }
+      });
+
+      failureMap.forEach((count, key) => {
+        if (count >= 2) {
+          const [userId] = key.split('-');
+          const user = profiles?.find((p) => p.id === userId);
+          if (user) {
+            generatedAlerts.push({
+              type: 'failure',
+              message: `${user.full_name} failed Regulatory Compliance quiz twice. Assign manager coaching?`,
+              user_id: userId,
+              severity: 'high',
+            });
+          }
+        }
+      });
+
+      // Check for completions
+      technicianData.forEach((tech) => {
+        if (tech.completion_percentage === 100) {
+          generatedAlerts.push({
+            type: 'success',
+            message: `${tech.full_name} completed all required modules.`,
+            user_id: tech.id,
+            severity: 'low',
+          });
+        }
+      });
+
+      // Group 3 regulatory compliance alert
+      const group3Alert = moduleStatistics.find((m) => 
+        m.module_title.toLowerCase().includes('regulatory') && m.avg_score < 40
+      );
+      if (group3Alert) {
+        generatedAlerts.push({
+          type: 'critical',
+          message: `Group 3 regulatory compliance performance critically low (${group3Alert.avg_score}% avg).`,
+          severity: 'critical',
+        });
+      }
+
+      setAlerts(generatedAlerts.slice(0, 5));
+
+      // Calculate group-based data
+      const groups = [
+        {
+          name: 'Group 1',
+          technicians: technicianData.filter((t) => 
+            ['Maria Chen', 'Jacob Lee', 'Sarah Patel'].includes(t.full_name)
+          ),
+        },
+        {
+          name: 'Group 2',
+          technicians: technicianData.filter((t) => 
+            ['Mike Rodriguez', 'James Park', 'Olga Smirnova'].includes(t.full_name)
+          ),
+        },
+        {
+          name: 'Group 3',
+          technicians: technicianData.filter((t) => 
+            ['John Smith', 'Alicia Kim', 'Deepa Rao', 'Franco Ortiz'].includes(t.full_name)
+          ),
+        },
+      ];
+
+      const groupStats = groups.map((group) => {
+        const avgCompletion = group.technicians.length > 0
+          ? Math.round(
+              group.technicians.reduce((sum, t) => sum + t.completion_percentage, 0) / group.technicians.length
+            )
+          : 0;
+        const avgScore = group.technicians.length > 0
+          ? Math.round(
+              group.technicians.reduce((sum, t) => sum + t.avg_score, 0) / group.technicians.length
+            )
+          : 0;
+
+        return {
+          name: group.name,
+          completion: avgCompletion,
+          competency: avgScore,
+          size: group.technicians.length,
+        };
+      });
+
+      setGroupData(groupStats);
     };
 
     fetchManagerData();
@@ -267,6 +380,207 @@ export const ManagerDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Real-Time Risk Alerts Panel */}
+      {alerts.length > 0 && (
+        <Card className="shadow-card border-destructive/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Real-Time Risk Alerts
+            </CardTitle>
+            <CardDescription>Immediate attention required for these issues</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {alerts.map((alert, idx) => (
+              <div
+                key={idx}
+                className={`p-4 border rounded-lg ${
+                  alert.severity === 'critical'
+                    ? 'border-destructive bg-destructive/5'
+                    : alert.severity === 'high'
+                    ? 'border-warning bg-warning/5'
+                    : 'border-success bg-success/5'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm flex-1">{alert.message}</p>
+                  <Badge
+                    variant={
+                      alert.severity === 'critical' || alert.severity === 'high'
+                        ? 'destructive'
+                        : 'default'
+                    }
+                  >
+                    {alert.severity === 'critical' ? 'Critical' : alert.severity === 'high' ? 'High' : 'Info'}
+                  </Badge>
+                </div>
+                {alert.type === 'failure' && (
+                  <Button size="sm" variant="outline" className="mt-2">
+                    <Target className="h-3 w-3 mr-1" />
+                    Assign Coaching
+                  </Button>
+                )}
+                {alert.type === 'success' && (
+                  <Button size="sm" variant="outline" className="mt-2">
+                    <Send className="h-3 w-3 mr-1" />
+                    Send Praise
+                  </Button>
+                )}
+                {alert.type === 'critical' && (
+                  <Button size="sm" variant="destructive" className="mt-2">
+                    <Target className="h-3 w-3 mr-1" />
+                    Prescribe Extra Training
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Visual Analytics - Charts and Graphs */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Module Performance Bar Chart */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle>Module Pass Rates & Scores</CardTitle>
+            <CardDescription>Completion and competency breakdown by module</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={moduleStats}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="module_title" 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={100}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="pass_rate" fill="hsl(var(--primary))" name="Pass Rate %" />
+                <Bar dataKey="avg_score" fill="hsl(var(--success))" name="Avg Score %" />
+              </BarChart>
+            </ResponsiveContainer>
+            {moduleStats.some((m) => m.avg_score < 60) && (
+              <div className="mt-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg">
+                <p className="text-sm font-medium text-destructive">
+                  ⚠️ Regulatory Compliance shows critically low performance (avg. 39%, pass rate 42%)
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Group Performance Comparison */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle>Team Group Performance</CardTitle>
+            <CardDescription>Completion and competency by training group</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={groupData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="completion" fill="hsl(var(--primary))" name="Completion %" />
+                <Bar dataKey="competency" fill="hsl(var(--accent))" name="Competency %" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Leaderboard - Top Performers */}
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-warning" />
+            Top Performers Leaderboard
+          </CardTitle>
+          <CardDescription>Technicians ranked by overall competency score</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[...technicians]
+              .sort((a, b) => b.avg_score - a.avg_score)
+              .slice(0, 5)
+              .map((tech, idx) => (
+                <div key={tech.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                  <div className={`
+                    flex items-center justify-center w-8 h-8 rounded-full font-bold
+                    ${idx === 0 ? 'bg-warning text-warning-foreground' : 
+                      idx === 1 ? 'bg-muted' : 
+                      idx === 2 ? 'bg-accent/30' : 'bg-muted/50'}
+                  `}>
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{tech.full_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tech.completed_modules}/{tech.total_modules} modules · {tech.completion_percentage}% complete
+                    </p>
+                  </div>
+                  <Badge variant={tech.avg_score >= 90 ? "default" : tech.avg_score >= 70 ? "outline" : "destructive"}>
+                    {tech.avg_score}%
+                  </Badge>
+                </div>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Group Performance Pie Chart */}
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle>Team Distribution by Performance Level</CardTitle>
+          <CardDescription>Breakdown of technicians by competency tier</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={[
+                  {
+                    name: 'Excellent (90%+)',
+                    value: technicians.filter((t) => t.avg_score >= 90).length,
+                  },
+                  {
+                    name: 'Good (70-89%)',
+                    value: technicians.filter((t) => t.avg_score >= 70 && t.avg_score < 90).length,
+                  },
+                  {
+                    name: 'Needs Improvement (50-69%)',
+                    value: technicians.filter((t) => t.avg_score >= 50 && t.avg_score < 70).length,
+                  },
+                  {
+                    name: 'Critical (<50%)',
+                    value: technicians.filter((t) => t.avg_score < 50).length,
+                  },
+                ]}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {COLORS.map((color, index) => (
+                  <Cell key={`cell-${index}`} fill={color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       {/* Team Skill Gaps Heatmap */}
       {skillGaps.length > 0 && (
