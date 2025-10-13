@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsesView } from "@/components/ResponsesView";
 import { UserEnrollmentList } from "@/components/UserEnrollmentList";
 import { Database } from "@/integrations/supabase/types";
+
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type UserMetric = Database['public']['Tables']['user_metrics']['Row'];
 
@@ -21,28 +22,32 @@ export const Analytics = () => {
         setLoading(true);
         setError(null);
         
-        // First, get all technician user IDs
-        const { data: techRoles, error: rolesError } = await supabase
+        // Step 1: Fetch the user IDs of all technicians from the user_roles table.
+        const { data: rolesData, error: rolesError } = await supabase
           .from('user_roles')
           .select('user_id')
           .eq('role', 'technician');
-        
-        if (rolesError) throw new Error(`User roles: ${rolesError.message}`);
-        
-        const technicianIds = techRoles?.map(r => r.user_id) || [];
-        
-        // Fetch technicians and their metrics in parallel
-        const [techniciansRes, metricsRes] = await Promise.all([
-          supabase.from('profiles').select('*').in('id', technicianIds),
-          supabase.from('user_metrics').select('*').in('user_id', technicianIds),
-        ]);
 
-        if (techniciansRes.error) throw new Error(`Technicians: ${techniciansRes.error.message}`);
-        if (metricsRes.error) throw new Error(`Metrics: ${metricsRes.error.message}`);
+        if (rolesError) throw new Error(`Technician Roles: ${rolesError.message}`);
         
-        // Update state with fetched data
-        setTechnicians(techniciansRes.data || []);
-        setMetrics(metricsRes.data || []);
+        const technicianIds = rolesData.map(role => role.user_id);
+
+        if (technicianIds.length > 0) {
+          // Step 2: Fetch the profiles and metrics for ONLY those technician IDs.
+          const [profilesRes, metricsRes] = await Promise.all([
+            supabase.from('profiles').select('*').in('id', technicianIds),
+            supabase.from('user_metrics').select('*').in('user_id', technicianIds)
+          ]);
+
+          if (profilesRes.error) throw new Error(`Profiles: ${profilesRes.error.message}`);
+          if (metricsRes.error) throw new Error(`Metrics: ${metricsRes.error.message}`);
+
+          setTechnicians(profilesRes.data || []);
+          setMetrics(metricsRes.data || []);
+        } else {
+          setTechnicians([]);
+          setMetrics([]);
+        }
 
       } catch (err: any) {
         setError(err.message);
@@ -57,7 +62,7 @@ export const Analytics = () => {
   const totalUsers = technicians.length;
   const activeLearners = metrics.filter(m => m.progress_percent > 0).length;
   const avgProgress = totalUsers > 0 ? Math.round(metrics.reduce((acc, m) => acc + (m.progress_percent || 0), 0) / totalUsers) : 0;
-  const avgAccuracy = totalUsers > 0 ? Math.round(metrics.reduce((acc, m) => acc + (m.accuracy_rate || 0), 0) / totalUsers) : 0;
+  const avgAccuracy = totalUsers > 0 ? Math.round(metrics.reduce((acc, m) => acc + (Number(m.accuracy_rate) || 0), 0) / totalUsers) : 0;
 
   if (loading) {
     return (
