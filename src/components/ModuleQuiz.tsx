@@ -1,3 +1,4 @@
+// Import necessary React hooks and components.
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,73 +10,94 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+// Define the structure for a multiple-choice question.
 interface QuizQuestion {
   id?: number;
   question: string;
   options: string[];
   correctAnswer: number;
-  type?: string;
+  type?: string; // Used to differentiate between question types (e.g., 'open_ended').
 }
 
+// Define the structure for an open-ended question.
 interface OpenEndedQuestion {
   question: string;
 }
 
+// Define the props that the ModuleQuiz component will accept.
 interface ModuleQuizProps {
   questions: QuizQuestion[];
-  moduleId?: string;
-  onComplete?: () => void;
+  moduleId?: string; // The ID of the current module, passed from the parent.
+  onComplete?: () => void; // A function to call when the quiz is fully completed.
 }
 
 export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps) => {
+  // Hook for displaying toast notifications.
   const { toast } = useToast();
+  // State to track the current question index.
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  // State to store the user's selected answer for the current question.
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  // State to control whether to show the quiz results screen.
   const [showResult, setShowResult] = useState(false);
+  // State to keep track of the user's score.
   const [score, setScore] = useState(0);
+  // State to track which questions have already been answered to prevent changing answers.
   const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>(
-    new Array(questions.filter(q => q.type !== "open_ended").length).fill(false)
+    new Array(questions.filter((q) => q.type !== "open_ended").length).fill(false),
   );
+  // State to store the user's text responses for open-ended questions.
   const [openEndedResponses, setOpenEndedResponses] = useState<Record<string, string>>({});
+  // State to control whether to show the open-ended questions section.
   const [showOpenEnded, setShowOpenEnded] = useState(false);
 
-  // Filter questions by type
-  const multipleChoiceQuestions = questions.filter(q => q.type !== "open_ended");
-  const openEndedData = questions.find(q => q.type === "open_ended") as any;
+  // Filter out the multiple-choice questions from the props.
+  const multipleChoiceQuestions = questions.filter((q) => q.type !== "open_ended");
+  // Find the data for open-ended questions.
+  const openEndedData = questions.find((q) => q.type === "open_ended") as any;
+  // Extract the actual open-ended questions from the data.
   const openEndedQuestions = openEndedData?.questions as OpenEndedQuestion[] | undefined;
 
+  // Handles the user selecting an answer for a multiple-choice question.
   const handleAnswerSelect = (answerIndex: number) => {
+    // Only allow selecting an answer if the current question hasn't been answered yet.
     if (!answeredQuestions[currentQuestion]) {
       setSelectedAnswer(answerIndex);
     }
   };
 
+  // Handles submitting the selected answer for a multiple-choice question.
   const handleSubmitAnswer = () => {
     if (selectedAnswer === null) return;
 
+    // Check if the selected answer is correct and update the score.
     const isCorrect = selectedAnswer === multipleChoiceQuestions[currentQuestion].correctAnswer;
     if (isCorrect) {
       setScore(score + 1);
     }
 
+    // Mark the current question as answered.
     const newAnsweredQuestions = [...answeredQuestions];
     newAnsweredQuestions[currentQuestion] = true;
     setAnsweredQuestions(newAnsweredQuestions);
 
+    // If this is the last multiple-choice question, show the results.
     if (currentQuestion === multipleChoiceQuestions.length - 1) {
       setShowResult(true);
-      // Automatically show open-ended questions after quiz if they exist
+      // If there are open-ended questions, automatically show them after a short delay.
       if (openEndedQuestions && openEndedQuestions.length > 0) {
         setTimeout(() => setShowOpenEnded(true), 1500);
       }
     }
   };
 
+  // Moves to the next multiple-choice question.
   const handleNextQuestion = () => {
     setSelectedAnswer(null);
     setCurrentQuestion(currentQuestion + 1);
   };
 
+  // Resets the quiz to its initial state for a retake.
   const handleRetakeQuiz = () => {
     setCurrentQuestion(0);
     setSelectedAnswer(null);
@@ -84,37 +106,45 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
     setAnsweredQuestions(new Array(multipleChoiceQuestions.length).fill(false));
   };
 
+  // Handles the final submission of open-ended responses to the database.
   const handleSubmitOpenEnded = async () => {
     if (!moduleId || !openEndedQuestions) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    // **FIXED**: Use the modern async method to get the current user.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     try {
+      // Prepare the response data for insertion into the database.
       const responses = Object.entries(openEndedResponses).map(([question, response]) => ({
-        user_id: user.id,
+        user_id: user.id, // Use the correctly fetched user ID.
         module_id: moduleId,
         question,
         response,
       }));
 
+      // Insert the responses into the 'module_responses' table.
       const { error } = await supabase.from("module_responses").insert(responses);
 
       if (error) throw error;
 
+      // Show a success message.
       toast({
         title: "Module completed!",
         description: "Your responses have been submitted and the module is complete.",
       });
 
+      // Reset the state and call the onComplete callback.
       setShowOpenEnded(false);
       setOpenEndedResponses({});
-      
-      // Call onComplete handler to mark module as complete
+
       if (onComplete) {
         onComplete();
       }
     } catch (error) {
+      // Show an error message if the submission fails.
       toast({
         title: "Error",
         description: "Failed to submit responses. Please try again.",
@@ -123,9 +153,10 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
     }
   };
 
+  // Calculates the user's score as a percentage.
   const getScorePercentage = () => Math.round((score / multipleChoiceQuestions.length) * 100);
 
-  // Show open-ended questions
+  // Renders the open-ended questions section.
   if (showOpenEnded && openEndedQuestions) {
     return (
       <Card className="shadow-elevated">
@@ -134,7 +165,8 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-muted-foreground">
-            Please answer the following open-ended questions to demonstrate your understanding. Your responses will be reviewed by your manager.
+            Please answer the following open-ended questions to demonstrate your understanding. Your responses will be
+            reviewed by your manager.
           </p>
           {openEndedQuestions.map((q: OpenEndedQuestion, index: number) => (
             <div key={index} className="space-y-2">
@@ -160,7 +192,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
             onClick={handleSubmitOpenEnded}
             disabled={
               Object.keys(openEndedResponses).length !== openEndedQuestions.length ||
-              Object.values(openEndedResponses).some(r => !r.trim())
+              Object.values(openEndedResponses).some((r) => !r.trim())
             }
             size="lg"
             className="w-full"
@@ -172,7 +204,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
     );
   }
 
-  // Show results
+  // Renders the quiz results screen.
   if (showResult) {
     const percentage = getScorePercentage();
     const passed = percentage >= 70;
@@ -185,9 +217,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
               <Award className="h-6 w-6 text-primary" />
               Quiz Complete!
             </CardTitle>
-            <Badge variant={passed ? "default" : "destructive"}>
-              {passed ? "Passed" : "Review Needed"}
-            </Badge>
+            <Badge variant={passed ? "default" : "destructive"}>{passed ? "Passed" : "Review Needed"}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -197,13 +227,9 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
               You scored {score} out of {multipleChoiceQuestions.length} questions correctly
             </p>
             {passed ? (
-              <p className="text-success">
-                Great job! You have demonstrated understanding of the material.
-              </p>
+              <p className="text-success">Great job! You have demonstrated understanding of the material.</p>
             ) : (
-              <p className="text-destructive">
-                Please review the module content and try again.
-              </p>
+              <p className="text-destructive">Please review the module content and try again.</p>
             )}
           </div>
           {!openEndedQuestions || openEndedQuestions.length === 0 ? (
@@ -212,9 +238,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
             </Button>
           ) : (
             <div className="bg-muted p-4 rounded-lg text-center">
-              <p className="text-muted-foreground">
-                Please complete the reflection questions to finish this module.
-              </p>
+              <p className="text-muted-foreground">Please complete the reflection questions to finish this module.</p>
             </div>
           )}
         </CardContent>
@@ -222,7 +246,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
     );
   }
 
-  // Show current question
+  // Renders the current multiple-choice question.
   const question = multipleChoiceQuestions[currentQuestion];
   const isAnswered = answeredQuestions[currentQuestion];
   const isCorrect = selectedAnswer === question.correctAnswer;
@@ -258,24 +282,17 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
                       ? isCorrectOption
                         ? "border-success bg-success/10"
                         : isSelected
-                        ? "border-destructive bg-destructive/10"
-                        : "border-border"
+                          ? "border-destructive bg-destructive/10"
+                          : "border-border"
                       : "border-border hover:border-primary"
                   }`}
                 >
                   <RadioGroupItem value={index.toString()} id={`option-${index}`} />
-                  <Label
-                    htmlFor={`option-${index}`}
-                    className="flex-1 cursor-pointer"
-                  >
+                  <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
                     {option}
                   </Label>
-                  {showFeedback && isCorrectOption && (
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  )}
-                  {showFeedback && isSelected && !isCorrectOption && (
-                    <XCircle className="h-5 w-5 text-destructive" />
-                  )}
+                  {showFeedback && isCorrectOption && <CheckCircle2 className="h-5 w-5 text-success" />}
+                  {showFeedback && isSelected && !isCorrectOption && <XCircle className="h-5 w-5 text-destructive" />}
                 </div>
               );
             })}
@@ -288,9 +305,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
               isCorrect ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
             }`}
           >
-            <p className="font-medium">
-              {isCorrect ? "Correct!" : "Incorrect"}
-            </p>
+            <p className="font-medium">{isCorrect ? "Correct!" : "Incorrect"}</p>
             <p className="text-sm mt-1">
               {isCorrect
                 ? "Great job! You selected the right answer."
@@ -301,12 +316,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
 
         <div className="flex gap-3">
           {!isAnswered ? (
-            <Button
-              onClick={handleSubmitAnswer}
-              disabled={selectedAnswer === null}
-              className="flex-1"
-              size="lg"
-            >
+            <Button onClick={handleSubmitAnswer} disabled={selectedAnswer === null} className="flex-1" size="lg">
               Submit Answer
             </Button>
           ) : currentQuestion < multipleChoiceQuestions.length - 1 ? (
@@ -325,11 +335,7 @@ export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps)
             <div
               key={index}
               className={`h-2 flex-1 rounded-full transition-colors ${
-                answeredQuestions[index]
-                  ? "bg-primary"
-                  : index === currentQuestion
-                  ? "bg-primary/50"
-                  : "bg-muted"
+                answeredQuestions[index] ? "bg-primary" : index === currentQuestion ? "bg-primary/50" : "bg-muted"
               }`}
             />
           ))}
