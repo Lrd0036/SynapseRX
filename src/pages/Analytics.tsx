@@ -7,6 +7,7 @@ import { ResponsesView } from "@/components/ResponsesView";
 const Analytics = () => {
   const [analytics, setAnalytics] = useState({
     totalUsers: 0,
+    activeLearners: 0,
     totalModules: 0,
     averageCompletion: 0,
     averageCompetencyScore: 0,
@@ -14,11 +15,29 @@ const Analytics = () => {
 
   useEffect(() => {
     const fetchAnalytics = async () => {
-      const { data: profiles } = await supabase.from("profiles").select("id");
+      // Fetch all technician user IDs
+      const { data: technicianRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "technician");
+
+      const technicianIds = technicianRoles?.map((r) => r.user_id) || [];
+
+      // Fetch technician profiles
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .in("id", technicianIds);
 
       const { data: modules } = await supabase.from("training_modules").select("id");
 
       const { data: progress } = await supabase.from("user_progress").select("*");
+
+      // Count active learners (technicians who have completed at least one module)
+      const techsWithCompletions = new Set(
+        progress?.filter((p) => p.completed && technicianIds.includes(p.user_id))
+          .map((p) => p.user_id) || []
+      );
 
       const { data: competencies } = await supabase
         .from("competency_records")
@@ -38,6 +57,7 @@ const Analytics = () => {
 
       setAnalytics({
         totalUsers: profiles?.length || 0,
+        activeLearners: techsWithCompletions.size,
         totalModules: modules?.length || 0,
         averageCompletion,
         averageCompetencyScore,
@@ -59,12 +79,23 @@ const Analytics = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Technicians</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">Active learners</p>
+            <p className="text-xs text-muted-foreground">All technicians</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Learners</CardTitle>
+            <TrendingUp className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.activeLearners}</div>
+            <p className="text-xs text-muted-foreground">With completions</p>
           </CardContent>
         </Card>
 
@@ -79,25 +110,14 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Completion</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.averageCompletion}%</div>
-            <p className="text-xs text-muted-foreground">Team progress</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
+        <Card className="shadow-card opacity-50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg. Competency</CardTitle>
-            <Award className="h-4 w-4 text-accent" />
+            <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.averageCompetencyScore}%</div>
-            <p className="text-xs text-muted-foreground">Performance score</p>
+            <div className="text-2xl font-bold text-muted-foreground">--</div>
+            <p className="text-xs text-muted-foreground">Data pending</p>
           </CardContent>
         </Card>
       </div>
