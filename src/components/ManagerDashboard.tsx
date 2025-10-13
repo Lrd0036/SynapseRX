@@ -59,39 +59,57 @@ export const ManagerDashboard = () => {
 
   useEffect(() => {
     const fetchManagerData = async () => {
-      // Fetch only technician profiles
-      const { data: technicianRoles } = await supabase
+      // Step 1: Fetch only the user IDs for users with the 'technician' role.
+      const { data: technicianRoles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id")
         .eq("role", "technician");
 
-      const technicianIds = technicianRoles?.map((r) => r.user_id) || [];
+      if (rolesError) {
+        console.error("Error fetching technician roles:", rolesError);
+        return;
+      }
 
+      const technicianIds = technicianRoles?.map((r) => r.user_id) || [];
+      
+      if (technicianIds.length === 0) {
+        // If there are no technicians, set the data to empty and stop.
+        setTechnicians([]);
+        setFilteredTechnicians([]);
+        setAnalytics({
+            totalUsers: 0,
+            activeLearners: 0,
+            totalModules: 0,
+            averageCompletion: 0,
+            averageCompetencyScore: 0,
+        });
+        return;
+      }
+
+      // Step 2: Fetch all data specifically for the identified technician IDs.
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, full_name, email")
         .in("id", technicianIds);
 
-      // Fetch user metrics
       const { data: metrics } = await supabase
         .from("user_metrics")
         .select("*")
         .in("user_id", technicianIds);
 
-      // Fetch modules
       const { data: modules } = await supabase
         .from("training_modules")
         .select("id, title");
 
-      // Fetch all progress
       const { data: allProgress } = await supabase
         .from("user_progress")
-        .select("*");
+        .select("*")
+        .in("user_id", technicianIds);
 
-      // Fetch all competencies
       const { data: competencies } = await supabase
         .from("competency_records")
-        .select("*");
+        .select("*")
+        .in("user_id", technicianIds);
 
       const totalCompleted = allProgress?.filter((p) => p.completed).length || 0;
       const totalPossible = (profiles?.length || 0) * (modules?.length || 0);
