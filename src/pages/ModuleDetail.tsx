@@ -116,12 +116,15 @@ const ModuleDetail = () => {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-            <div className="text-center space-y-2">
-              <Video className="h-16 w-16 mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Video content will be displayed here</p>
-              <p className="text-xs text-muted-foreground">Module: {module.title}</p>
-            </div>
+          <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+            <video 
+              className="w-full h-full object-cover"
+              controls
+              preload="metadata"
+            >
+              <source src="/videos/pharmacy-safety-protocols.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
           </div>
 
           <div className="prose dark:prose-invert max-w-none">
