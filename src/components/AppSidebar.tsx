@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Activity, BookOpen, MessageSquare, BarChart3, Award, LogOut, Lightbulb, Sparkles } from "lucide-react";
+import { Activity, BookOpen, MessageSquare, BarChart3, Award, LogOut, Lightbulb, Sparkles, Upload } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +27,7 @@ const managerItems = [
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Insights", url: "/insights", icon: Lightbulb },
   { title: "Learning Insights", url: "/learning-insights", icon: Sparkles },
+  { title: "Bulk Import", url: "/bulk-import", icon: Upload },
 ];
 
 export function AppSidebar() {

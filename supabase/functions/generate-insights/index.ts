@@ -33,6 +33,10 @@ serve(async (req) => {
       .from("training_modules")
       .select("*");
 
+    const { data: metrics } = await supabase
+      .from("user_metrics")
+      .select("*");
+
     const { data: progress } = await supabase
       .from("user_progress")
       .select("*");
@@ -69,34 +73,45 @@ serve(async (req) => {
     // Generate recommendations
     const recommendations = [];
 
-    // Check group performance
+    // Check group performance based on user_metrics
     for (const group of groups) {
-      for (const module of modules || []) {
-        const moduleCompetencies = competencies?.filter(
-          (c) =>
-            group.technicians?.some((t) => t.id === c.user_id) &&
-            (c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(" ")[0]) ||
-             c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(" ")[1] || ""))
-        ) || [];
+      const groupMetrics = metrics?.filter((m) =>
+        group.technicians?.some((t) => t.id === m.user_id)
+      ) || [];
 
-        if (moduleCompetencies.length > 0) {
-          const lowScorers = moduleCompetencies.filter((c) => c.score < 60);
-          const percentageLowScorers =
-            (lowScorers.length / moduleCompetencies.length) * 100;
+      if (groupMetrics.length > 0) {
+        const avgProgress =
+          groupMetrics.reduce((sum, m) => sum + m.progress_percent, 0) / groupMetrics.length;
 
-          if (percentageLowScorers >= 60) {
-            recommendations.push({
-              type: "group_gap",
-              severity: "high",
-              group: group.name,
-              module: module.title,
-              message: `Technicians in ${group.name} are behind in ${module.title}—assign more training.`,
-              details: `${lowScorers.length} out of ${moduleCompetencies.length} technicians scored below 60%.`,
-              action: "assign_training",
-              module_id: module.id,
-              group_name: group.name,
-            });
-          }
+        if (avgProgress < 30) {
+          recommendations.push({
+            type: "group_gap",
+            severity: "high",
+            group: group.name,
+            message: `${group.name} needs more Regulatory Compliance training—average progress ${Math.round(avgProgress)}%.`,
+            details: `${groupMetrics.length} technicians with average ${Math.round(avgProgress)}% progress.`,
+            action: "assign_training",
+            group_name: group.name,
+          });
+        }
+      }
+    }
+
+    // Check individual technician performance based on user_metrics
+    for (const metric of metrics || []) {
+      if (parseFloat(metric.accuracy_rate) < 70) {
+        const profile = profiles?.find((p) => p.id === metric.user_id);
+        if (profile) {
+          recommendations.push({
+            type: "individual_support",
+            severity: "critical",
+            technician_id: profile.id,
+            technician_name: profile.full_name,
+            message: `Technician ${profile.full_name} needs targeted support—schedule 1:1 coaching or remedial training.`,
+            details: `Accuracy rate at ${metric.accuracy_rate}% - needs targeted support for improvement.`,
+            action: "schedule_coaching",
+            email: profile.email,
+          });
         }
       }
     }

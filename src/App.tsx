@@ -12,6 +12,7 @@ import Competencies from "./pages/Competencies";
 import Analytics from "./pages/Analytics";
 import Insights from "./pages/Insights";
 import LearningInsights from "./pages/LearningInsights";
+import BulkImport from "./pages/BulkImport";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
@@ -109,6 +110,18 @@ const App = () => (
                 <RoleProtectedRoute requiredRole="manager">
                   <AppLayout>
                     <LearningInsights />
+                  </AppLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bulk-import"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="manager">
+                  <AppLayout>
+                    <BulkImport />
                   </AppLayout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

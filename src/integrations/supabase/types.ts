@@ -191,6 +191,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_metrics: {
+        Row: {
+          accuracy_rate: number
+          created_at: string
+          id: string
+          progress_percent: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy_rate?: number
+          created_at?: string
+          id?: string
+          progress_percent?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy_rate?: number
+          created_at?: string
+          id?: string
+          progress_percent?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_progress: {
         Row: {
           completed: boolean

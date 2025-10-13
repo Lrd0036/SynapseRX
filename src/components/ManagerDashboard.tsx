@@ -71,6 +71,12 @@ export const ManagerDashboard = () => {
         .select("id, full_name, email")
         .in("id", technicianIds);
 
+      // Fetch user metrics
+      const { data: metrics } = await supabase
+        .from("user_metrics")
+        .select("*")
+        .in("user_id", technicianIds);
+
       // Fetch modules
       const { data: modules } = await supabase
         .from("training_modules")
@@ -109,13 +115,22 @@ export const ManagerDashboard = () => {
       const technicianData: TechnicianData[] = (profiles || []).map((profile) => {
         const userProgress = allProgress?.filter((p) => p.user_id === profile.id) || [];
         const userCompetencies = competencies?.filter((c) => c.user_id === profile.id) || [];
+        const userMetric = (metrics || []).find((m) => m.user_id === profile.id);
 
         const completed = userProgress.filter((p) => p.completed).length;
         const inProgress = userProgress.filter((p) => !p.completed && p.progress_percentage > 0).length;
         const total = modules?.length || 0;
-        const avgScore = userCompetencies.length
+        
+        // Use AccuracyRate from user_metrics, fallback to competency average
+        const avgScore = userMetric?.accuracy_rate 
+          ? Math.round(Number(userMetric.accuracy_rate))
+          : userCompetencies.length
           ? Math.round(userCompetencies.reduce((sum, c) => sum + c.score, 0) / userCompetencies.length)
           : 0;
+        
+        // Use ProgressPercent from user_metrics
+        const completionPercentage = userMetric?.progress_percent || 
+          (total > 0 ? Math.round((completed / total) * 100) : 0);
 
         return {
           id: profile.id,
@@ -125,7 +140,7 @@ export const ManagerDashboard = () => {
           total_modules: total,
           avg_score: avgScore,
           in_progress: inProgress,
-          completion_percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+          completion_percentage: completionPercentage,
         };
       });
 
