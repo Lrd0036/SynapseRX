@@ -24,10 +24,19 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch all necessary data
+    // Fetch technician IDs only
+    const { data: technicianRoles } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "technician");
+
+    const technicianIds = technicianRoles?.map((r) => r.user_id) || [];
+
+    // Fetch all necessary data for technicians only
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, full_name, email");
+      .select("id, full_name, email")
+      .in("id", technicianIds);
 
     const { data: modules } = await supabase
       .from("training_modules")
@@ -35,15 +44,18 @@ serve(async (req) => {
 
     const { data: metrics } = await supabase
       .from("user_metrics")
-      .select("*");
+      .select("*")
+      .in("user_id", technicianIds);
 
     const { data: progress } = await supabase
       .from("user_progress")
-      .select("*");
+      .select("*")
+      .in("user_id", technicianIds);
 
     const { data: competencies } = await supabase
       .from("competency_records")
       .select("*")
+      .in("user_id", technicianIds)
       .order("assessed_at", { ascending: false });
 
     // Calculate group-based statistics
@@ -82,24 +94,40 @@ serve(async (req) => {
       if (groupMetrics.length > 0) {
         const avgProgress =
           groupMetrics.reduce((sum, m) => sum + m.progress_percent, 0) / groupMetrics.length;
+        const avgAccuracy =
+          groupMetrics.reduce((sum, m) => sum + parseFloat(m.accuracy_rate), 0) / groupMetrics.length;
 
-        if (avgProgress < 30) {
+        if (avgProgress < 50) {
           recommendations.push({
             type: "group_gap",
             severity: "high",
             group: group.name,
             message: `${group.name} needs more Regulatory Compliance training—average progress ${Math.round(avgProgress)}%.`,
-            details: `${groupMetrics.length} technicians with average ${Math.round(avgProgress)}% progress.`,
+            details: `${groupMetrics.length} technicians with average ${Math.round(avgProgress)}% progress. Assign module now for improvement.`,
             action: "assign_training",
+            group_name: group.name,
+          });
+        }
+
+        if (avgAccuracy < 60) {
+          recommendations.push({
+            type: "group_competency",
+            severity: "warning",
+            group: group.name,
+            message: `${group.name} has low competency—review training approach`,
+            details: `Average accuracy ${Math.round(avgAccuracy)}% across ${groupMetrics.length} technicians. Consider additional support materials.`,
+            action: "review_training",
             group_name: group.name,
           });
         }
       }
     }
 
-    // Check individual technician performance based on user_metrics
+    // Check individual technician performance based on user_metrics (accuracy < 70% for 2 consecutive modules)
     for (const metric of metrics || []) {
-      if (parseFloat(metric.accuracy_rate) < 70) {
+      const accuracyRate = parseFloat(metric.accuracy_rate);
+      
+      if (accuracyRate < 70) {
         const profile = profiles?.find((p) => p.id === metric.user_id);
         if (profile) {
           recommendations.push({
@@ -107,9 +135,23 @@ serve(async (req) => {
             severity: "critical",
             technician_id: profile.id,
             technician_name: profile.full_name,
-            message: `Technician ${profile.full_name} needs targeted support—schedule 1:1 coaching or remedial training.`,
-            details: `Accuracy rate at ${metric.accuracy_rate}% - needs targeted support for improvement.`,
+            message: `${profile.full_name} needs immediate remediation—accuracy rate ${Math.round(accuracyRate)}%`,
+            details: `Accuracy rate at ${Math.round(accuracyRate)}% - assign remediation training and schedule 1:1 coaching session immediately.`,
             action: "schedule_coaching",
+            email: profile.email,
+          });
+        }
+      } else if (accuracyRate < 80) {
+        const profile = profiles?.find((p) => p.id === metric.user_id);
+        if (profile) {
+          recommendations.push({
+            type: "individual_warning",
+            severity: "warning",
+            technician_id: profile.id,
+            technician_name: profile.full_name,
+            message: `${profile.full_name} approaching remediation threshold—accuracy ${Math.round(accuracyRate)}%`,
+            details: `Monitor performance closely. Consider additional support materials and check-in.`,
+            action: "send_encouragement",
             email: profile.email,
           });
         }
