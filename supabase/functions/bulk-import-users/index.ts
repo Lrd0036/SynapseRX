@@ -1,23 +1,22 @@
-// Import the 'serve' function from the Deno standard library for creating an HTTP server.
+// Import Deno's server and Supabase client library.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Import the 'createClient' function from the Supabase JavaScript library.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 
-// Define CORS headers to allow cross-origin requests.
+// Define CORS headers to allow requests from any origin.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Start the server and handle incoming requests.
+// Start the Deno server to handle incoming requests.
 serve(async (req) => {
-  // Respond to preflight OPTIONS requests with the CORS headers.
+  // Handle preflight OPTIONS requests for CORS.
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create a new Supabase client with admin privileges using environment variables.
+    // Create an admin Supabase client to perform privileged operations.
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -29,123 +28,111 @@ serve(async (req) => {
       },
     );
 
-    // Parse the JSON body of the request to get the CSV data.
+    // Get the CSV data from the request body.
     const { csvData } = await req.json();
 
-    // Check if the CSV data is valid.
+    // Validate that the CSV data is a non-empty array.
     if (!csvData || !Array.isArray(csvData)) {
       throw new Error("Invalid CSV data format");
     }
 
-    // Initialize an object to store the results of the import process.
-    const results: {
-      success: Array<{ email: string; role: string }>;
-      errors: Array<{ email: string; error: string }>;
-    } = {
+    // Initialize an object to track successes and failures.
+    const results = {
       success: [],
       errors: [],
     };
 
-    // Iterate over each row of the CSV data.
+    // Process each row in the CSV data.
     for (const row of csvData) {
       try {
-        // Destructure the required fields from the row.
+        // Destructure required fields from the row.
         const { FirstName, LastName, Email, Password, AccuracyRate, ProgressPercent } = row;
 
-        // Check for missing required fields.
+        // Ensure all required fields are present.
         if (!Email || !Password || !FirstName || !LastName) {
           results.errors.push({ email: Email, error: "Missing required fields" });
-          continue;
+          continue; // Skip to the next row.
         }
 
-        // Determine the user's role based on their email address.
-        const isManager = Email.includes("manager");
-        const role = isManager ? "manager" : "technician";
+        // Determine the user's role.
+        const role = Email.includes("manager") ? "manager" : "technician";
 
-        // Create a new user in the Supabase auth system.
+        // Step 1: Create the authentication user.
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email: Email,
           password: Password,
-          email_confirm: true,
+          email_confirm: true, // Mark email as confirmed automatically.
           user_metadata: {
             full_name: `${FirstName} ${LastName}`,
           },
         });
 
-        // If there was an error creating the user, add it to the errors array.
         if (authError) {
           results.errors.push({ email: Email, error: authError.message });
           continue;
         }
 
+        // **CRITICAL FIX**: Get the user ID from the successful auth creation.
         const userId = authData.user.id;
 
-        // Create a new profile for the user in the 'profiles' table.
+        // Step 2: Create the corresponding public data records.
+        // Create a profile record.
         const { error: profileError } = await supabaseAdmin.from("profiles").insert({
           id: userId,
           full_name: `${FirstName} ${LastName}`,
           email: Email,
         });
 
-        // If there was an error creating the profile, add it to the errors array.
         if (profileError) {
-          results.errors.push({ email: Email, error: `Profile: ${profileError.message}` });
+          results.errors.push({ email: Email, error: `Profile Error: ${profileError.message}` });
           continue;
         }
 
-        // Assign a role to the user in the 'user_roles' table.
+        // Create a user role record.
         const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
           user_id: userId,
           role: role,
         });
 
-        // If there was an error assigning the role, add it to the errors array.
         if (roleError) {
-          results.errors.push({ email: Email, error: `Role: ${roleError.message}` });
+          results.errors.push({ email: Email, error: `Role Error: ${roleError.message}` });
           continue;
         }
 
-        // Create a new record for the user in the 'user_metrics' table.
+        // Create a user metrics record.
         const { error: metricsError } = await supabaseAdmin.from("user_metrics").insert({
           user_id: userId,
           accuracy_rate: parseFloat(AccuracyRate) || 0,
           progress_percent: parseInt(ProgressPercent) || 0,
         });
 
-        // If there was an error creating the metrics, add it to the errors array.
         if (metricsError) {
-          results.errors.push({ email: Email, error: `Metrics: ${metricsError.message}` });
+          results.errors.push({ email: Email, error: `Metrics Error: ${metricsError.message}` });
           continue;
         }
 
-        // If everything was successful, add the user to the success array.
+        // If all steps succeed, log it and add to the success array.
         results.success.push({ email: Email, role });
-        console.log(`Successfully created user: ${Email} with role: ${role}`);
+        console.log(`Successfully created and configured user: ${Email}`);
       } catch (err) {
-        // If there was an unexpected error, add it to the errors array.
         results.errors.push({
           email: row.Email,
-          error: err instanceof Error ? err.message : "Unknown error",
+          error: err instanceof Error ? err.message : "An unknown error occurred",
         });
       }
     }
 
-    // Return the results of the import process as a JSON response.
+    // Return a summary of the import process.
     return new Response(JSON.stringify(results), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    // If there was a fatal error, log it and return an error response.
-    console.error("Bulk import error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      },
-    );
+    // Handle any top-level errors during the process.
+    console.error("Fatal bulk import error:", error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Server error" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
