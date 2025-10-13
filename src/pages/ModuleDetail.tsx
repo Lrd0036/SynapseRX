@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Clock, BookOpen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Quiz } from "@/components/Quiz";
+import { ModuleQuiz } from "@/components/ModuleQuiz";
 import ReactMarkdown from "react-markdown";
 
 const ModuleDetail = () => {
@@ -156,13 +156,7 @@ const ModuleDetail = () => {
           )}
 
           {module.quiz_questions && module.quiz_questions.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="text-xl font-semibold">Assessment Quiz</h3>
-              </div>
-              <Quiz questions={module.quiz_questions} />
-            </div>
+            <ModuleQuiz questions={module.quiz_questions} />
           )}
 
           {!progress?.completed && (
