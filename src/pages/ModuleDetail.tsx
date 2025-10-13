@@ -5,8 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Clock, Video } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Quiz } from "@/components/Quiz";
+import ReactMarkdown from "react-markdown";
 
 const ModuleDetail = () => {
   const { id } = useParams();
@@ -129,23 +131,39 @@ const ModuleDetail = () => {
             </div>
           )}
 
-          <div className="prose dark:prose-invert max-w-none">
-            <h3>Learning Objectives</h3>
-            <ul>
-              <li>Understand key concepts and principles</li>
-              <li>Apply knowledge to real-world scenarios</li>
-              <li>Demonstrate competency in practical skills</li>
-              <li>Meet certification requirements</li>
-            </ul>
+          {module.content ? (
+            <div className="prose dark:prose-invert max-w-none">
+              <ReactMarkdown>{module.content}</ReactMarkdown>
+            </div>
+          ) : (
+            <div className="prose dark:prose-invert max-w-none">
+              <h3>Learning Objectives</h3>
+              <ul>
+                <li>Understand key concepts and principles</li>
+                <li>Apply knowledge to real-world scenarios</li>
+                <li>Demonstrate competency in practical skills</li>
+                <li>Meet certification requirements</li>
+              </ul>
 
-            <h3>Course Content</h3>
-            <p>
-              This comprehensive training module covers essential topics required for pharmacy
-              technician certification. Each section is designed to build upon previous knowledge
-              and provide practical, actionable skills you can immediately apply in a pharmacy
-              setting.
-            </p>
-          </div>
+              <h3>Course Content</h3>
+              <p>
+                This comprehensive training module covers essential topics required for pharmacy
+                technician certification. Each section is designed to build upon previous knowledge
+                and provide practical, actionable skills you can immediately apply in a pharmacy
+                setting.
+              </p>
+            </div>
+          )}
+
+          {module.quiz_questions && module.quiz_questions.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <h3 className="text-xl font-semibold">Assessment Quiz</h3>
+              </div>
+              <Quiz questions={module.quiz_questions} />
+            </div>
+          )}
 
           {!progress?.completed && (
             <Button onClick={handleMarkComplete} className="w-full" size="lg">
