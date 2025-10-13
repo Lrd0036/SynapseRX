@@ -11,6 +11,7 @@ import Consultation from "./pages/Consultation";
 import Competencies from "./pages/Competencies";
 import Analytics from "./pages/Analytics";
 import Insights from "./pages/Insights";
+import LearningInsights from "./pages/LearningInsights";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
@@ -96,6 +97,18 @@ const App = () => (
                 <RoleProtectedRoute requiredRole="manager">
                   <AppLayout>
                     <Insights />
+                  </AppLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/learning-insights"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="manager">
+                  <AppLayout>
+                    <LearningInsights />
                   </AppLayout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
