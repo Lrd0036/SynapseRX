@@ -92,33 +92,39 @@ export type Database = {
       training_modules: {
         Row: {
           category: string | null
+          content: string | null
           created_at: string
           description: string | null
           duration_minutes: number | null
           id: string
           order_index: number
+          quiz_questions: Json | null
           title: string
           updated_at: string
           video_url: string | null
         }
         Insert: {
           category?: string | null
+          content?: string | null
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
           id?: string
           order_index?: number
+          quiz_questions?: Json | null
           title: string
           updated_at?: string
           video_url?: string | null
         }
         Update: {
           category?: string | null
+          content?: string | null
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
           id?: string
           order_index?: number
+          quiz_questions?: Json | null
           title?: string
           updated_at?: string
           video_url?: string | null
