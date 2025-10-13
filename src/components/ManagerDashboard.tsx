@@ -58,10 +58,18 @@ export const ManagerDashboard = () => {
 
   useEffect(() => {
     const fetchManagerData = async () => {
-      // Fetch profiles
+      // Fetch only technician profiles
+      const { data: technicianRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "technician");
+
+      const technicianIds = technicianRoles?.map((r) => r.user_id) || [];
+
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, email");
+        .select("id, full_name, email")
+        .in("id", technicianIds);
 
       // Fetch modules
       const { data: modules } = await supabase
