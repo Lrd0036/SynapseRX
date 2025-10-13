@@ -1,128 +1,94 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, BookOpen, Award, TrendingUp } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Users, BookOpen, Target, CheckCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsesView } from "@/components/ResponsesView";
+import { UserEnrollmentList } from "@/components/UserEnrollmentList";
+import { Database } from "@/integrations/supabase/types";
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type UserMetric = Database['public']['Tables']['user_metrics']['Row'];
+type ModuleResponseWithDetails = Database['public']['Tables']['module_responses']['Row'] & {
+  profiles: { full_name: string } | null;
+  training_modules: { title: string } | null;
+};
 
-const Analytics = () => {
-  const [analytics, setAnalytics] = useState({
-    totalUsers: 0,
-    activeLearners: 0,
-    totalModules: 0,
-    averageCompletion: 0,
-    averageCompetencyScore: 0,
-  });
+export const Analytics = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [technicians, setTechnicians] = useState<Profile[]>([]);
+  const [metrics, setMetrics] = useState<UserMetric[]>([]);
+  const [responses, setResponses] = useState<ModuleResponseWithDetails[]>([]);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      // Fetch all technician user IDs
-      const { data: technicianRoles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "technician");
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [techniciansRes, metricsRes, responsesRes] = await Promise.all([
+          supabase.from('user_roles').select('profiles:user_id(*)').eq('role', 'technician'),
+          supabase.from('user_metrics').select('*'),
+          supabase.from('module_responses').select('*, profiles:user_id(full_name), training_modules:module_id(title)'),
+        ]);
 
-      const technicianIds = technicianRoles?.map((r) => r.user_id) || [];
+        if (techniciansRes.error) throw new Error(`Technicians: ${techniciansRes.error.message}`);
+        if (metricsRes.error) throw new Error(`Metrics: ${metricsRes.error.message}`);
+        if (responsesRes.error) throw new Error(`Responses: ${responsesRes.error.message}`);
+        
+        setTechnicians((techniciansRes.data?.map(t => t.profiles).filter(Boolean) as Profile[]) || []);
+        setMetrics(metricsRes.data || []);
+        setResponses((responsesRes.data as ModuleResponseWithDetails[]) || []);
 
-      // Fetch technician profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id")
-        .in("id", technicianIds);
-
-      const { data: modules } = await supabase.from("training_modules").select("id");
-
-      const { data: progress } = await supabase.from("user_progress").select("*");
-
-      // Count active learners (technicians who have completed at least one module)
-      const techsWithCompletions = new Set(
-        progress?.filter((p) => p.completed && technicianIds.includes(p.user_id))
-          .map((p) => p.user_id) || []
-      );
-
-      const { data: competencies } = await supabase
-        .from("competency_records")
-        .select("score");
-
-      const totalCompleted = progress?.filter((p) => p.completed).length || 0;
-      const totalPossible = (profiles?.length || 0) * (modules?.length || 0);
-      const averageCompletion = totalPossible
-        ? Math.round((totalCompleted / totalPossible) * 100)
-        : 0;
-
-      const averageCompetencyScore = competencies?.length
-        ? Math.round(
-            competencies.reduce((sum, c) => sum + c.score, 0) / competencies.length
-          )
-        : 0;
-
-      setAnalytics({
-        totalUsers: profiles?.length || 0,
-        activeLearners: techsWithCompletions.size,
-        totalModules: modules?.length || 0,
-        averageCompletion,
-        averageCompetencyScore,
-      });
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchAnalytics();
+    fetchData();
   }, []);
+
+  const totalUsers = technicians.length;
+  const activeLearners = metrics.filter(m => m.progress_percent > 0).length;
+  const avgProgress = totalUsers > 0 ? Math.round(metrics.reduce((acc, m) => acc + (m.progress_percent || 0), 0) / totalUsers) : 0;
+  const avgAccuracy = totalUsers > 0 ? Math.round(metrics.reduce((acc, m) => acc + (m.accuracy_rate || 0), 0) / totalUsers) : 0;
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <h1 className="text-2xl font-bold">Manager Analytics</h1>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-6 text-red-600 bg-red-50 border border-red-200 rounded-md">Error loading analytics data: {error}</div>;
+  }
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Manager Analytics</h1>
-        <p className="text-muted-foreground">
-          Overview of team training progress and performance metrics
-        </p>
-      </div>
-
+      <h1 className="text-2xl font-bold">Manager Analytics</h1>
+      
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">All technicians</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Learners</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.activeLearners}</div>
-            <p className="text-xs text-muted-foreground">With completions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Training Modules</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalModules}</div>
-            <p className="text-xs text-muted-foreground">Available courses</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card opacity-50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Competency</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-muted-foreground">--</div>
-            <p className="text-xs text-muted-foreground">Data pending</p>
-          </CardContent>
-        </Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Technicians</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalUsers}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Active Learners</CardTitle><BookOpen className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{activeLearners}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Avg. Team Progress</CardTitle><Target className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{avgProgress}%</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Avg. Team Accuracy</CardTitle><CheckCircle className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{avgAccuracy}%</div></CardContent></Card>
       </div>
 
-      <ResponsesView />
+      <UserEnrollmentList users={technicians} metrics={metrics} />
+      
+      <ResponsesView responses={responses} />
     </div>
   );
 };
