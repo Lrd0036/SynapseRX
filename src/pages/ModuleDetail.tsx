@@ -44,7 +44,7 @@ const ModuleDetail = () => {
     fetchModuleData();
   }, [id]);
 
-  const handleMarkComplete = async () => {
+  const handleModuleComplete = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -65,12 +65,10 @@ const ModuleDetail = () => {
       return;
     }
 
-    toast({
-      title: "Module completed!",
-      description: "Great job! You've completed this training module.",
-    });
-
-    navigate("/modules");
+    // Redirect to modules page
+    setTimeout(() => {
+      navigate("/modules");
+    }, 1500);
   };
 
   if (loading || !module) {
@@ -155,15 +153,22 @@ const ModuleDetail = () => {
             </div>
           )}
 
-          {module.quiz_questions && module.quiz_questions.length > 0 && (
-            <ModuleQuiz questions={module.quiz_questions} moduleId={id} />
+          {module.quiz_questions && module.quiz_questions.length > 0 && !progress?.completed && (
+            <ModuleQuiz 
+              questions={module.quiz_questions} 
+              moduleId={id}
+              onComplete={handleModuleComplete}
+            />
           )}
 
-          {!progress?.completed && (
-            <Button onClick={handleMarkComplete} className="w-full" size="lg">
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Mark as Complete
-            </Button>
+          {progress?.completed && (
+            <div className="bg-success/10 border border-success p-6 rounded-lg text-center">
+              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-success mb-2">Module Completed</h3>
+              <p className="text-muted-foreground">
+                You have successfully completed this training module.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>

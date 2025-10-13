@@ -24,9 +24,10 @@ interface OpenEndedQuestion {
 interface ModuleQuizProps {
   questions: QuizQuestion[];
   moduleId?: string;
+  onComplete?: () => void;
 }
 
-export const ModuleQuiz = ({ questions, moduleId }: ModuleQuizProps) => {
+export const ModuleQuiz = ({ questions, moduleId, onComplete }: ModuleQuizProps) => {
   const { toast } = useToast();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -63,6 +64,10 @@ export const ModuleQuiz = ({ questions, moduleId }: ModuleQuizProps) => {
 
     if (currentQuestion === multipleChoiceQuestions.length - 1) {
       setShowResult(true);
+      // Automatically show open-ended questions after quiz if they exist
+      if (openEndedQuestions && openEndedQuestions.length > 0) {
+        setTimeout(() => setShowOpenEnded(true), 1500);
+      }
     }
   };
 
@@ -98,12 +103,17 @@ export const ModuleQuiz = ({ questions, moduleId }: ModuleQuizProps) => {
       if (error) throw error;
 
       toast({
-        title: "Responses submitted!",
-        description: "Your reflection responses have been recorded.",
+        title: "Module completed!",
+        description: "Your responses have been submitted and the module is complete.",
       });
 
       setShowOpenEnded(false);
       setOpenEndedResponses({});
+      
+      // Call onComplete handler to mark module as complete
+      if (onComplete) {
+        onComplete();
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -146,21 +156,17 @@ export const ModuleQuiz = ({ questions, moduleId }: ModuleQuizProps) => {
               />
             </div>
           ))}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSubmitOpenEnded}
-              disabled={
-                Object.keys(openEndedResponses).length !== openEndedQuestions.length ||
-                Object.values(openEndedResponses).some(r => !r.trim())
-              }
-              size="lg"
-            >
-              Submit Responses
-            </Button>
-            <Button variant="outline" onClick={() => setShowOpenEnded(false)} size="lg">
-              Back to Results
-            </Button>
-          </div>
+          <Button
+            onClick={handleSubmitOpenEnded}
+            disabled={
+              Object.keys(openEndedResponses).length !== openEndedQuestions.length ||
+              Object.values(openEndedResponses).some(r => !r.trim())
+            }
+            size="lg"
+            className="w-full"
+          >
+            Submit and Complete Module
+          </Button>
         </CardContent>
       </Card>
     );
@@ -200,21 +206,17 @@ export const ModuleQuiz = ({ questions, moduleId }: ModuleQuizProps) => {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button onClick={handleRetakeQuiz} className="flex-1" size="lg">
+          {!openEndedQuestions || openEndedQuestions.length === 0 ? (
+            <Button onClick={handleRetakeQuiz} className="w-full" size="lg">
               Retake Quiz
             </Button>
-            {openEndedQuestions && (
-              <Button
-                onClick={() => setShowOpenEnded(true)}
-                variant="outline"
-                className="flex-1"
-                size="lg"
-              >
-                Answer Reflection Questions
-              </Button>
-            )}
-          </div>
+          ) : (
+            <div className="bg-muted p-4 rounded-lg text-center">
+              <p className="text-muted-foreground">
+                Please complete the reflection questions to finish this module.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
