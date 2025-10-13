@@ -116,16 +116,18 @@ const ModuleDetail = () => {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-            <video 
-              className="w-full h-full object-cover"
-              controls
-              preload="metadata"
-            >
-              <source src="/videos/pharmacy-safety-protocols.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-          </div>
+          {module.video_url && (
+            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+              <video 
+                className="w-full h-full object-cover"
+                controls
+                preload="metadata"
+              >
+                <source src={module.video_url} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
 
           <div className="prose dark:prose-invert max-w-none">
             <h3>Learning Objectives</h3>
