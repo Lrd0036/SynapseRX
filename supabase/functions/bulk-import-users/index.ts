@@ -37,7 +37,10 @@ serve(async (req) => {
     }
 
     // Initialize an object to track successes and failures.
-    const results = {
+    const results: {
+      success: Array<{ email: string; role: string; action: string }>;
+      errors: Array<{ email: string; error: string }>;
+    } = {
       success: [],
       errors: [],
     };
@@ -66,16 +69,13 @@ serve(async (req) => {
         let userAction = "created"; // Assume we are creating a new user by default.
 
         // **REVISED UPSERT LOGIC**
-        // Step 1: Check if an authentication user already exists.
+        // Step 1: Try to list users with this email to check if they exist
         const {
-          data: { user: existingUser },
-          error: userError,
-        } = await supabaseAdmin.auth.admin.getUserByEmail(Email);
+          data: { users: existingUsers },
+          error: listError,
+        } = await supabaseAdmin.auth.admin.listUsers();
 
-        // This handles cases where getUserByEmail returns an error for reasons other than "User not found".
-        if (userError && userError.message !== "User not found") {
-          throw new Error(`Auth lookup error: ${userError.message}`);
-        }
+        const existingUser = existingUsers?.find(u => u.email === Email);
 
         if (existingUser) {
           // If the user exists, we'll use their ID and mark the action as 'updated'.
@@ -102,9 +102,13 @@ serve(async (req) => {
           });
 
           if (createError) {
-            // This will catch the "User already registered" error if something went wrong with the check.
             throw new Error(`Auth creation error: ${createError.message}`);
           }
+          
+          if (!newUser) {
+            throw new Error("User creation returned null");
+          }
+          
           userId = newUser.id;
         }
 
