@@ -28,15 +28,12 @@ serve(async (req) => {
       },
     );
 
-    // Get the CSV data from the request body.
     const { csvData } = await req.json();
 
-    // Validate that the CSV data is a non-empty array.
     if (!csvData || !Array.isArray(csvData)) {
       throw new Error("Invalid CSV data format");
     }
 
-    // Initialize an object to track successes and failures.
     const results: {
       success: Array<{ email: string; role: string; action: string }>;
       errors: Array<{ email: string; error: string }>;
@@ -47,9 +44,7 @@ serve(async (req) => {
 
     // Process each row in the CSV data.
     for (const row of csvData) {
-      // Use a new try/catch block for each row to ensure one error doesn't stop the whole process.
       try {
-        // Sanitize and trim all incoming string data from the CSV row.
         const Email = row.Email?.trim();
         const FirstName = row.FirstName?.trim();
         const LastName = row.LastName?.trim();
@@ -62,72 +57,60 @@ serve(async (req) => {
             email: Email || "Unknown",
             error: "Missing required fields (Email, FirstName, LastName)",
           });
-          continue; // Skip to the next row.
+          continue;
         }
 
         let userId: string;
-        let userAction = "created"; // Assume we are creating a new user by default.
+        let userAction = "created";
 
-        // **REVISED UPSERT LOGIC**
-        // Step 1: Try to list users with this email to check if they exist
-        const {
-          data: { users: existingUsers },
-          error: listError,
-        } = await supabaseAdmin.auth.admin.listUsers();
+        // **ROBUST UPSERT LOGIC**
+        // Step 1: Attempt to create the user directly.
+        const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email: Email,
+          password: Password,
+          email_confirm: true,
+          user_metadata: { full_name: `${FirstName} ${LastName}` },
+        });
 
-        const existingUser = existingUsers?.find(u => u.email === Email);
+        if (createError) {
+          // If creation fails because the user already exists, treat it as an update path.
+          if (createError.message.includes("already been registered")) {
+            const {
+              data: { user: existingUser },
+              error: getUserError,
+            } = await supabaseAdmin.auth.admin.getUserByEmail(Email);
 
-        if (existingUser) {
-          // If the user exists, we'll use their ID and mark the action as 'updated'.
-          userId = existingUser.id;
-          userAction = "updated";
-          console.log(`User ${Email} already exists. Proceeding with update.`);
+            if (getUserError) throw new Error(`Failed to retrieve existing user ${Email}: ${getUserError.message}`);
+            if (!existingUser) throw new Error(`Could not find user ${Email} after creation conflict.`);
+
+            userId = existingUser.id;
+            userAction = "updated";
+            console.log(`User ${Email} exists. Updating associated data.`);
+          } else {
+            // If it's a different auth error (e.g., weak password), report it.
+            throw createError;
+          }
         } else {
-          // If the user does not exist, we must create them. A password is required.
-          if (!Password) {
-            results.errors.push({ email: Email, error: "Missing password for new user creation." });
-            continue;
-          }
-
-          const {
-            data: { user: newUser },
-            error: createError,
-          } = await supabaseAdmin.auth.admin.createUser({
-            email: Email,
-            password: Password,
-            email_confirm: true,
-            user_metadata: {
-              full_name: `${FirstName} ${LastName}`,
-            },
-          });
-
-          if (createError) {
-            throw new Error(`Auth creation error: ${createError.message}`);
-          }
-          
-          if (!newUser) {
-            throw new Error("User creation returned null");
-          }
-          
-          userId = newUser.id;
+          // If creation was successful, get the new user's ID.
+          userId = createData.user.id;
         }
 
-        // Step 2: Now that we have a userId, upsert the associated public data.
+        // Step 2: With a valid userId, perform upserts on the public tables.
         const role = Email.includes("manager") ? "manager" : "technician";
 
-        // Upsert profile data
+        // Upsert profile data (update if ID exists, insert if not).
         const { error: profileError } = await supabaseAdmin
           .from("profiles")
           .upsert({ id: userId, full_name: `${FirstName} ${LastName}`, email: Email }, { onConflict: "id" });
-        if (profileError) throw new Error(`Profile upsert failed: ${profileError.message}`);
+        if (profileError) throw new Error(`Profile upsert: ${profileError.message}`);
 
-        // Upsert role data
+        // Upsert role data (update if user_id exists, insert if not).
         const { error: roleError } = await supabaseAdmin
           .from("user_roles")
           .upsert({ user_id: userId, role: role }, { onConflict: "user_id" });
-        if (roleError) throw new Error(`Role upsert failed: ${roleError.message}`);
+        if (roleError) throw new Error(`Role upsert: ${roleError.message}`);
 
-        // Upsert metrics data
+        // Upsert metrics data (update if user_id exists, insert if not).
         const { error: metricsError } = await supabaseAdmin.from("user_metrics").upsert(
           {
             user_id: userId,
@@ -136,12 +119,10 @@ serve(async (req) => {
           },
           { onConflict: "user_id" },
         );
-        if (metricsError) throw new Error(`Metrics upsert failed: ${metricsError.message}`);
+        if (metricsError) throw new Error(`Metrics upsert: ${metricsError.message}`);
 
-        // If all operations succeed, record the success.
         results.success.push({ email: Email, role, action: userAction });
       } catch (err) {
-        // Catch any error within the loop for a specific row and add it to the results.
         results.errors.push({
           email: row.Email,
           error: err instanceof Error ? err.message : "An unknown error occurred during row processing.",
@@ -149,13 +130,11 @@ serve(async (req) => {
       }
     }
 
-    // Return a summary of the import process.
     return new Response(JSON.stringify(results), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    // Handle any fatal errors that occur outside the loop (e.g., parsing JSON).
     console.error("Fatal bulk import error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Server error" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
