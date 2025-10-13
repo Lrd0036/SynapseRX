@@ -156,7 +156,7 @@ const ModuleDetail = () => {
           )}
 
           {module.quiz_questions && module.quiz_questions.length > 0 && (
-            <ModuleQuiz questions={module.quiz_questions} />
+            <ModuleQuiz questions={module.quiz_questions} moduleId={id} />
           )}
 
           {!progress?.completed && (

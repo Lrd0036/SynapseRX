@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, BookOpen, Award, TrendingUp, BarChart3 } from "lucide-react";
+import { Users, BookOpen, Award, TrendingUp } from "lucide-react";
+import { ResponsesView } from "@/components/ResponsesView";
 
 const Analytics = () => {
   const [analytics, setAnalytics] = useState({
@@ -101,21 +102,7 @@ const Analytics = () => {
         </Card>
       </div>
 
-      <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle>Team Performance Overview</CardTitle>
-          <CardDescription>
-            Detailed analytics and insights into training effectiveness
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-            <p>Detailed analytics charts will be displayed here</p>
-            <p className="text-sm mt-1">Track progress, completion rates, and competency trends</p>
-          </div>
-        </CardContent>
-      </Card>
+      <ResponsesView />
     </div>
   );
 };

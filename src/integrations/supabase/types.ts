@@ -65,6 +65,33 @@ export type Database = {
         }
         Relationships: []
       }
+      module_responses: {
+        Row: {
+          id: string
+          module_id: string
+          question: string
+          response: string
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          module_id: string
+          question: string
+          response: string
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          module_id?: string
+          question?: string
+          response?: string
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

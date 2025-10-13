@@ -3,28 +3,45 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, XCircle, Award } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface QuizQuestion {
-  id: number;
+  id?: number;
   question: string;
   options: string[];
   correctAnswer: number;
+  type?: string;
+}
+
+interface OpenEndedQuestion {
+  question: string;
 }
 
 interface ModuleQuizProps {
   questions: QuizQuestion[];
+  moduleId?: string;
 }
 
-export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
+export const ModuleQuiz = ({ questions, moduleId }: ModuleQuizProps) => {
+  const { toast } = useToast();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>(
-    new Array(questions.length).fill(false)
+    new Array(questions.filter(q => q.type !== "open_ended").length).fill(false)
   );
+  const [openEndedResponses, setOpenEndedResponses] = useState<Record<string, string>>({});
+  const [showOpenEnded, setShowOpenEnded] = useState(false);
+
+  // Filter questions by type
+  const multipleChoiceQuestions = questions.filter(q => q.type !== "open_ended");
+  const openEndedData = questions.find(q => q.type === "open_ended") as any;
+  const openEndedQuestions = openEndedData?.questions as OpenEndedQuestion[] | undefined;
 
   const handleAnswerSelect = (answerIndex: number) => {
     if (!answeredQuestions[currentQuestion]) {
@@ -35,7 +52,7 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
   const handleSubmitAnswer = () => {
     if (selectedAnswer === null) return;
 
-    const isCorrect = selectedAnswer === questions[currentQuestion].correctAnswer;
+    const isCorrect = selectedAnswer === multipleChoiceQuestions[currentQuestion].correctAnswer;
     if (isCorrect) {
       setScore(score + 1);
     }
@@ -44,7 +61,7 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
     newAnsweredQuestions[currentQuestion] = true;
     setAnsweredQuestions(newAnsweredQuestions);
 
-    if (currentQuestion === questions.length - 1) {
+    if (currentQuestion === multipleChoiceQuestions.length - 1) {
       setShowResult(true);
     }
   };
@@ -59,11 +76,97 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
     setSelectedAnswer(null);
     setShowResult(false);
     setScore(0);
-    setAnsweredQuestions(new Array(questions.length).fill(false));
+    setAnsweredQuestions(new Array(multipleChoiceQuestions.length).fill(false));
   };
 
-  const getScorePercentage = () => Math.round((score / questions.length) * 100);
+  const handleSubmitOpenEnded = async () => {
+    if (!moduleId || !openEndedQuestions) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const responses = Object.entries(openEndedResponses).map(([question, response]) => ({
+        user_id: user.id,
+        module_id: moduleId,
+        question,
+        response,
+      }));
+
+      const { error } = await supabase.from("module_responses").insert(responses);
+
+      if (error) throw error;
+
+      toast({
+        title: "Responses submitted!",
+        description: "Your reflection responses have been recorded.",
+      });
+
+      setShowOpenEnded(false);
+      setOpenEndedResponses({});
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit responses. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getScorePercentage = () => Math.round((score / multipleChoiceQuestions.length) * 100);
+
+  // Show open-ended questions
+  if (showOpenEnded && openEndedQuestions) {
+    return (
+      <Card className="shadow-elevated">
+        <CardHeader>
+          <CardTitle>Reflection Questions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-muted-foreground">
+            Please answer the following open-ended questions to demonstrate your understanding. Your responses will be reviewed by your manager.
+          </p>
+          {openEndedQuestions.map((q: OpenEndedQuestion, index: number) => (
+            <div key={index} className="space-y-2">
+              <Label htmlFor={`question-${index}`} className="text-base font-medium">
+                {index + 1}. {q.question}
+              </Label>
+              <Textarea
+                id={`question-${index}`}
+                placeholder="Type your response here..."
+                value={openEndedResponses[q.question] || ""}
+                onChange={(e) =>
+                  setOpenEndedResponses({
+                    ...openEndedResponses,
+                    [q.question]: e.target.value,
+                  })
+                }
+                rows={5}
+                className="w-full"
+              />
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSubmitOpenEnded}
+              disabled={
+                Object.keys(openEndedResponses).length !== openEndedQuestions.length ||
+                Object.values(openEndedResponses).some(r => !r.trim())
+              }
+              size="lg"
+            >
+              Submit Responses
+            </Button>
+            <Button variant="outline" onClick={() => setShowOpenEnded(false)} size="lg">
+              Back to Results
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show results
   if (showResult) {
     const percentage = getScorePercentage();
     const passed = percentage >= 70;
@@ -85,7 +188,7 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
           <div className="text-center space-y-4">
             <div className="text-6xl font-bold text-primary">{percentage}%</div>
             <p className="text-lg text-muted-foreground">
-              You scored {score} out of {questions.length} questions correctly
+              You scored {score} out of {multipleChoiceQuestions.length} questions correctly
             </p>
             {passed ? (
               <p className="text-success">
@@ -97,15 +200,28 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
               </p>
             )}
           </div>
-          <Button onClick={handleRetakeQuiz} className="w-full" size="lg">
-            Retake Quiz
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleRetakeQuiz} className="flex-1" size="lg">
+              Retake Quiz
+            </Button>
+            {openEndedQuestions && (
+              <Button
+                onClick={() => setShowOpenEnded(true)}
+                variant="outline"
+                className="flex-1"
+                size="lg"
+              >
+                Answer Reflection Questions
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  const question = questions[currentQuestion];
+  // Show current question
+  const question = multipleChoiceQuestions[currentQuestion];
   const isAnswered = answeredQuestions[currentQuestion];
   const isCorrect = selectedAnswer === question.correctAnswer;
 
@@ -115,7 +231,7 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
         <div className="flex items-center justify-between">
           <CardTitle>Assessment Quiz</CardTitle>
           <Badge variant="outline">
-            Question {currentQuestion + 1} of {questions.length}
+            Question {currentQuestion + 1} of {multipleChoiceQuestions.length}
           </Badge>
         </div>
       </CardHeader>
@@ -191,7 +307,7 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
             >
               Submit Answer
             </Button>
-          ) : currentQuestion < questions.length - 1 ? (
+          ) : currentQuestion < multipleChoiceQuestions.length - 1 ? (
             <Button onClick={handleNextQuestion} className="flex-1" size="lg">
               Next Question
             </Button>
@@ -203,7 +319,7 @@ export const ModuleQuiz = ({ questions }: ModuleQuizProps) => {
         </div>
 
         <div className="flex gap-1 justify-center">
-          {questions.map((_, index) => (
+          {multipleChoiceQuestions.map((_, index) => (
             <div
               key={index}
               className={`h-2 flex-1 rounded-full transition-colors ${
