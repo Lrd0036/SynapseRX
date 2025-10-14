@@ -129,7 +129,7 @@ const ModuleDetail = () => {
             </div>
           )}
 
-          {module.content ? (
+          {module.content && typeof module.content === 'string' ? (
             <div className="prose dark:prose-invert max-w-none">
               <ReactMarkdown>{module.content}</ReactMarkdown>
             </div>
