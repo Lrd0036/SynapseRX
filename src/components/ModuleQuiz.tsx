@@ -23,7 +23,8 @@ interface ModuleQuizProps {
 }
 
 const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete }) => {
-  const toast = useToast();
+  const { toast } = useToast();
+
   const multipleChoiceQuestions = questions.filter((q) => q.type !== "openended");
   const openEndedQuestions = questions.filter((q) => q.type === "openended");
 
@@ -199,7 +200,6 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
   const currentQuestion = multipleChoiceQuestions[currentQuestionIndex];
   const correctAnswerIndex = currentQuestion.options.indexOf(currentQuestion.correct_answer);
   const isAnswered = answeredQuestions[currentQuestionIndex];
-  const isSelectedCorrect = selectedAnswerIndex === correctAnswerIndex;
 
   return (
     <Card>
@@ -213,7 +213,7 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
         <h3 className="mb-4 font-semibold">{currentQuestion.question_text}</h3>
         <RadioGroup
           value={selectedAnswerIndex !== null ? selectedAnswerIndex.toString() : ""}
-          onValueChange={(value) => handleAnswerSelection(parseInt(value))}
+          onValueChange={(value) => setSelectedAnswerIndex(parseInt(value))}
           disabled={isAnswered}
         >
           {currentQuestion.options.map((option, idx) => {

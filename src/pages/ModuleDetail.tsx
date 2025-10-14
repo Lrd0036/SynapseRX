@@ -13,7 +13,7 @@ import ModuleQuiz from "../components/ModuleQuiz";
 interface DbQuestion {
   id: string;
   question_text: string;
-  options: string[]; // assuming options stored as string array
+  options: string[];
   correct_answer: string;
 }
 
@@ -21,7 +21,7 @@ interface TrainingModule {
   id: string;
   title: string;
   description: string;
-  content?: string; // markdown or JSON string content
+  content?: string;
 }
 
 interface UserProgress {
@@ -32,12 +32,12 @@ interface UserProgress {
 const ModuleDetail: React.FC = () => {
   const { id: moduleId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const toast = useToast();
+  const { toast } = useToast();
 
   const [module, setModule] = useState<TrainingModule | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [questions, setQuestions] = useState<DbQuestion[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!moduleId) {
@@ -48,33 +48,26 @@ const ModuleDetail: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
 
-      // Get authenticated user ID
       const { data: userData, error: userError } = await supabase.auth.getUser();
 
       if (userError || !userData.user) {
-        toast({ title: "Unauthorized", description: "You must be signed in.", variant: "destructive" });
+        toast({ title: "Unauthorized", description: "Please sign in.", variant: "destructive" });
         setLoading(false);
         return;
       }
 
       const userId = userData.user.id;
 
-      // Fetch module details
       const moduleRes = await supabase.from<TrainingModule>("trainingmodules").select("*").eq("id", moduleId).single();
 
-      if (moduleRes.error || !moduleRes.data) {
-        toast({
-          title: "Error",
-          description: moduleRes.error?.message || "Failed to load module",
-          variant: "destructive",
-        });
+      if (moduleRes.error) {
+        toast({ title: "Error", description: moduleRes.error.message, variant: "destructive" });
         setLoading(false);
         return;
       }
 
       setModule(moduleRes.data);
 
-      // Fetch user progress
       const progressRes = await supabase
         .from<UserProgress>("userprogress")
         .select("completed, progress_percentage")
@@ -88,7 +81,6 @@ const ModuleDetail: React.FC = () => {
         setProgress(progressRes.data || null);
       }
 
-      // Fetch quiz questions
       const questionsRes = await supabase
         .from<DbQuestion>("questions")
         .select("id, question_text, options, correct_answer")
@@ -136,7 +128,6 @@ const ModuleDetail: React.FC = () => {
   };
 
   if (loading) return <div className="p-6 text-center">Loading module...</div>;
-
   if (!module) return <div className="p-6 text-center">Module not found</div>;
 
   const hasQuiz = questions.length > 0;
