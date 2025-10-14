@@ -17,13 +17,13 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
 const technicianItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Activity },
   { title: "Training Modules", url: "/modules", icon: BookOpen },
   { title: "Consultation", url: "/consultation", icon: MessageSquare },
   { title: "Competencies", url: "/competencies", icon: Award },
 ];
 
 const managerItems = [
+  { title: "Dashboard", url: "/dashboard", icon: Activity },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Insights", url: "/insights", icon: Lightbulb },
   { title: "Learning Insights", url: "/learning-insights", icon: Sparkles },
