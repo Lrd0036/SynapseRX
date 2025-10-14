@@ -1,73 +1,74 @@
-# Welcome to your Lovable project
+# SynapseRX AI: Intelligent Training & Consultation System
 
-## Project info
+## 🌟 Project Pitch
 
-**URL**: https://lovable.dev/projects/1e8532c8-1e71-4c3f-b4c6-bcdd02332dbb
+[cite_start]**SynapseRX AI** is the first AI/ML-powered platform specifically designed to combat the global **pharmacy technician workforce crisis** [cite: 2833] [cite_start]by ensuring standardized, competency-based training and providing **real-time decision support** during patient interactions. [cite_start]It transforms the "training the trainers" problem into a scalable solution[cite: 2838].
 
-## How can I edit this code?
+[cite_start]The crisis, marked by **21-30% annual turnover** [cite: 2849] [cite_start]and **$40+ billion in annual medication error costs**[cite: 2856], requires a systematic solution that technology can provide.
 
-There are several ways of editing your application.
+## ✨ Core Features
 
-**Use Lovable**
+The platform is structured around three core components:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/1e8532c8-1e71-4c3f-b4c6-bcdd02332dbb) and start prompting.
+### 1. Adaptive Learning & Competency Development (SDG 4)
 
-Changes made via Lovable will be committed automatically to this repo.
+* **Sequenced Modules:** Training modules unlock sequentially based on completion status, guiding the technician through a structured learning path.
+* **Rich Content & Quizzing:** Modules feature rich Markdown content (for example, the "Pharmacy Safety Fundamentals" module) with embedded multiple-choice quizzes and open-ended written responses.
+* **Real-time Progress:** Tracks individual module progress and overall completion percentage.
+* **Compliance Tracking:** Dedicated screens for monitoring formal competency assessment records and certification expiration dates (`certifications` table).
 
-**Use your preferred IDE**
+### 2. Real-Time Consultation & Decision Support (SDG 3)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+* **Live Chat UI:** A dedicated chat interface for technicians to seek **instant, context-specific guidance** during complex patient scenarios.
+* **Realtime Communication:** Utilizes Supabase Realtime Channels to instantly stream messages to the interface.
+* **AI Enhancement:** Architected to integrate with a custom LLM API for contextual decision support, currently using placeholder logic for simulation purposes.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 3. Management & Analytics Dashboard (SDG 8 & 10)
 
-Follow these steps:
+* **Comprehensive Analytics:** Manager dashboards provide an overview of the entire team, including total users, active learners, average completion, and average competency scores.
+* **Performance Visualization:** Uses data visualization (Bar Charts and Pie Charts) to compare performance across groups and rank technicians on a **Top Performers Leaderboard**.
+* **AI-Powered Insights:** The **Learning Insights** view calls a Supabase Edge Function (`generate-insights`) to run predictive models, generating automated **Risk Alerts** and coaching recommendations for low-performing individuals or skill gaps.
+* **Bulk Management:** Includes a **Bulk Import** screen with a Supabase Edge Function (`bulk-import-users`) for rapidly creating and setting up large numbers of new users, roles, and initial metrics from a single CSV file.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 💻 Technical Stack
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+This project is built using modern web development and cloud technologies:
 
-# Step 3: Install the necessary dependencies.
-npm i
+| Category | Technology | Purpose in Project |
+| :--- | :--- | :--- |
+| **Frontend** | **React**, **TypeScript**, **Vite** | Fast, modern application scaffolding and development. |
+| **UI/Styling** | **shadcn/ui**, **Tailwind CSS** | Accessible, reusable UI components and utility-first styling. |
+| **Backend/DB** | **Supabase** | Provides PostgreSQL database, Authentication, and Realtime capabilities. |
+| **Serverless/API** | **Supabase Edge Functions (Deno)** | Hosts the `bulk-import-users` and `generate-insights` functions for privileged/AI operations. |
+| **Data Viz** | **Recharts** | Used for displaying performance trends, module pass rates, and group comparisons. |
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## 🛠️ Local Development Setup
 
-**Edit a file directly in GitHub**
+The only requirement is having Node.js & npm installed.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1.  **Clone the repository:**
+    ```sh
+    git clone <YOUR_GIT_URL>
+    cd <YOUR_PROJECT_NAME>
+    ```
 
-**Use GitHub Codespaces**
+2.  **Install dependencies:**
+    ```sh
+    npm install
+    ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3.  **Configure Environment Variables:**
+    Create a `.env.local` file based on the provided `.env`. You must also configure your Supabase project's `SUPABASE_SERVICE_ROLE_KEY` in the appropriate environment (e.g., Vercel, Supabase dashboard) for the Edge Functions to work correctly.
+    ```env
+    VITE_SUPABASE_PROJECT_ID="kvfldjqgisgilvtsyser"
+    VITE_SUPABASE_PUBLISHABLE_KEY="..."
+    VITE_SUPABASE_URL="[https://kvfldjqgisgilvtsyser.supabase.co](https://kvfldjqgisgilvtsyser.supabase.co)"
+    # Note: SUPABASE_SERVICE_ROLE_KEY is required for Edge Functions
+    # but should not be committed to the repo or included in VITE_*.
+    ```
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/1e8532c8-1e71-4c3f-b4c6-bcdd02332dbb) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+4.  **Start the development server:**
+    ```sh
+    npm run dev
+    ```
+    The application will be accessible at `http://localhost:8080`.
