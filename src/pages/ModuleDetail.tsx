@@ -90,7 +90,7 @@ const mockSupabase = {
 // Use the mock client
 const supabase = mockSupabase;
 
-// Mock Database types (in a real scenario, these would be generated)
+// Mock Database types (in a real scenario, these would be generated from your schema)
 namespace Database {
   export namespace public {
     export namespace Tables {
@@ -116,7 +116,7 @@ namespace Database {
           module_id: string;
           question_text: string | null;
           question_type: string | null;
-          options: any; // jsonb
+          options: any; // jsonb in DB
           correct_answer: string | null;
           created_at: string;
         };
@@ -128,8 +128,9 @@ namespace Database {
 const useToast = () => ({
   toast: (options: { title: string; description: string; variant?: string }) => {
     console.log(`Toast: ${options.title} - ${options.description}`);
-    // In a real app, you'd render a toast component here.
-    alert(`${options.title}: ${options.description}`);
+    // A real app would have a visual toast component.
+    // Using alert for simplicity in this mock environment.
+    // alert(`${options.title}: ${options.description}`);
   },
 });
 
@@ -200,25 +201,27 @@ const ModuleQuiz: FC<{ questions: any[]; moduleId: string; onComplete: () => voi
       </p>
       <p className="font-medium mb-4">{question.question_text}</p>
       <div className="space-y-3">
-        {question.options.map((option: string, index: number) => (
-          <div
-            key={index}
-            className="flex items-center p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <input
-              type="radio"
-              name={`q-${question.id}`}
-              id={`${question.id}-${index}`}
-              className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-            />
-            <label
-              htmlFor={`${question.id}-${index}`}
-              className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300"
+        {question.options &&
+          Array.isArray(question.options) &&
+          question.options.map((option: string, index: number) => (
+            <div
+              key={index}
+              className="flex items-center p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              {option}
-            </label>
-          </div>
-        ))}
+              <input
+                type="radio"
+                name={`q-${question.id}`}
+                id={`${question.id}-${index}`}
+                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <label
+                htmlFor={`${question.id}-${index}`}
+                className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                {option}
+              </label>
+            </div>
+          ))}
       </div>
       <Button onClick={handleNext} className="mt-6">
         {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Submit & Complete"}
@@ -307,11 +310,10 @@ const ModuleDetail: FC = () => {
         setModule(moduleResult.data);
         setProgress(progressResult.data);
 
-        const formattedQuestions =
-          questionsResult.data?.map((q) => ({
-            ...q,
-            options: Array.isArray(q.options) ? q.options : [],
-          })) || [];
+        const formattedQuestions = (questionsResult.data || []).map((q) => ({
+          ...q,
+          options: Array.isArray(q.options) ? q.options : [],
+        }));
 
         setQuestions(formattedQuestions as Question[]);
       } catch (error) {
