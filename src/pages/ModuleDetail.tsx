@@ -28,12 +28,15 @@ interface UserProgress {
   progress_percentage: number;
 }
 
-// Interface for quiz questions stored in JSONB
+// Interface for questions from the questions table
 interface QuizQuestion {
+  id: string;
+  module_id: string;
   question_text: string;
   question_type: string;
   options: string[];
   correct_answer: string;
+  created_at: string;
 }
 
 const ModuleDetail: FC = () => {
@@ -114,19 +117,18 @@ const ModuleDetail: FC = () => {
 
         setProgress(progressData);
 
-        // Parse quiz questions from module's quiz_questions field
-        if (moduleData.quiz_questions) {
-          try {
-            const parsedQuestions = Array.isArray(moduleData.quiz_questions) 
-              ? moduleData.quiz_questions 
-              : JSON.parse(moduleData.quiz_questions as string);
-            setQuestions(parsedQuestions);
-          } catch (error) {
-            console.error("Error parsing quiz questions:", error);
-            setQuestions([]);
-          }
-        } else {
+        // Fetch Quiz Questions from separate questions table
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("module_id", moduleId)
+          .order("created_at", { ascending: true });
+
+        if (questionsError) {
+          console.error("Error fetching questions:", questionsError);
           setQuestions([]);
+        } else {
+          setQuestions(questionsData || []);
         }
       } catch (error) {
         console.error("Error fetching module data:", error);

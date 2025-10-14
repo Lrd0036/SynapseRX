@@ -22,7 +22,7 @@ export const Analytics = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch technician IDs
+        // Step 1: Fetch the user IDs of all technicians from the user_roles table.
         const { data: rolesData, error: rolesError } = await supabase
           .from('user_roles')
           .select('user_id')
@@ -33,44 +33,17 @@ export const Analytics = () => {
         const technicianIds = rolesData.map(role => role.user_id);
 
         if (technicianIds.length > 0) {
-          // Fetch profiles, total modules count, and user progress
-          const [profilesRes, modulesRes, progressRes, responsesRes] = await Promise.all([
+          // Step 2: Fetch the profiles and metrics for ONLY those technician IDs.
+          const [profilesRes, metricsRes] = await Promise.all([
             supabase.from('profiles').select('*').in('id', technicianIds),
-            supabase.from('training_modules').select('id'),
-            supabase.from('user_progress').select('user_id, module_id, completed').in('user_id', technicianIds),
-            supabase.from('module_responses').select('user_id, response, question').in('user_id', technicianIds)
+            supabase.from('user_metrics').select('*').in('user_id', technicianIds)
           ]);
 
           if (profilesRes.error) throw new Error(`Profiles: ${profilesRes.error.message}`);
-          if (modulesRes.error) throw new Error(`Modules: ${modulesRes.error.message}`);
-          if (progressRes.error) throw new Error(`Progress: ${progressRes.error.message}`);
-
-          const totalModules = modulesRes.data.length;
-          const progressData = progressRes.data || [];
-          const responsesData = responsesRes.data || [];
-
-          // Calculate metrics from user_progress
-          const calculatedMetrics = technicianIds.map(userId => {
-            const userProgress = progressData.filter(p => p.user_id === userId);
-            const completedModules = userProgress.filter(p => p.completed).length;
-            const progressPercent = totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
-            
-            // Calculate accuracy from responses
-            const userResponses = responsesData.filter(r => r.user_id === userId);
-            const accuracyRate = userResponses.length > 0 ? Math.round(Math.random() * 30 + 70) : 0; // Placeholder until we track correctness
-
-            return {
-              id: userId,
-              user_id: userId,
-              progress_percent: progressPercent,
-              accuracy_rate: accuracyRate,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-          });
+          if (metricsRes.error) throw new Error(`Metrics: ${metricsRes.error.message}`);
 
           setTechnicians(profilesRes.data || []);
-          setMetrics(calculatedMetrics);
+          setMetrics(metricsRes.data || []);
         } else {
           setTechnicians([]);
           setMetrics([]);
