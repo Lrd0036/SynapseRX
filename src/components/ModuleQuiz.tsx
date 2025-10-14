@@ -81,7 +81,7 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
 
   const handleSubmitOpenEnded = async () => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user || !moduleId) {
+    if (userError || !userData?.user || !moduleId) {
       toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
       return;
     }
@@ -246,5 +246,4 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
     </Card>
   );
 };
-
 export default ModuleQuiz;
