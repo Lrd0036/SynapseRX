@@ -21,6 +21,8 @@ interface Module {
   content: any;
   order_index: number;
   created_at: string;
+  quiz_questions?: any;
+  learning_goals?: string;
 }
 
 interface UserProgress {
@@ -30,13 +32,13 @@ interface UserProgress {
 
 // Interface for questions from the questions table
 interface QuizQuestion {
-  id: string;
-  module_id: string;
+  id?: string;
+  module_id?: string;
   question_text: string;
   question_type: string;
   options: string[];
   correct_answer: string;
-  created_at: string;
+  created_at?: string;
 }
 
 const ModuleDetail: FC = () => {
@@ -117,18 +119,19 @@ const ModuleDetail: FC = () => {
 
         setProgress(progressData);
 
-        // Fetch Quiz Questions from separate questions table
-        const { data: questionsData, error: questionsError } = await supabase
-          .from("questions")
-          .select("*")
-          .eq("module_id", moduleId)
-          .order("created_at", { ascending: true });
-
-        if (questionsError) {
-          console.error("Error fetching questions:", questionsError);
-          setQuestions([]);
+        // Extract Quiz Questions from module's quiz_questions JSONB field
+        if (moduleData?.quiz_questions) {
+          try {
+            const parsedQuestions = Array.isArray(moduleData.quiz_questions) 
+              ? (moduleData.quiz_questions as unknown as QuizQuestion[])
+              : [];
+            setQuestions(parsedQuestions);
+          } catch (err) {
+            console.error("Error parsing quiz questions:", err);
+            setQuestions([]);
+          }
         } else {
-          setQuestions(questionsData || []);
+          setQuestions([]);
         }
       } catch (error) {
         console.error("Error fetching module data:", error);
@@ -222,6 +225,16 @@ const ModuleDetail: FC = () => {
           )}
         </CardHeader>
         <CardContent>
+          {/* Display the new learning goals section */}
+          {module.learning_goals && (
+            <div className="mb-6 space-y-2 border-l-4 border-primary/50 pl-4">
+              <h3 className="text-xl font-bold text-primary">Learning Goals</h3>
+              <div className="prose dark:prose-invert max-w-none text-muted-foreground">
+                <ReactMarkdown>{module.learning_goals}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+
           {markdownContent && (
             <div className="prose dark:prose-invert max-w-none">
               <ReactMarkdown>{markdownContent}</ReactMarkdown>
