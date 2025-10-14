@@ -26,23 +26,18 @@ const ModuleDetail: React.FC = () => {
       setLoading(true);
 
       const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) {
-        toast({ title: "Unauthorized", description: "Please sign in.", variant: "destructive" });
+      if (userError || !userData?.user) {
+        toast({ title: "Unauthorized", description: "Sign in!", variant: "destructive" });
         setLoading(false);
         return;
       }
       const userId = userData.user.id;
 
-      // Fetch training module details
+      // Training module
       const modRes = await supabase.from("training_modules").select("*").eq("id", moduleId).single();
-      if (modRes.error || !modRes.data) {
-        toast({ title: "Error", description: modRes.error?.message || "Module not found", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-      setModule(modRes.data);
+      setModule(modRes.data ?? null);
 
-      // Fetch user progress for module
+      // User progress
       const progressRes = await supabase
         .from("user_progress")
         .select("completed, progress_percentage")
@@ -51,7 +46,7 @@ const ModuleDetail: React.FC = () => {
         .maybeSingle();
       setProgress(progressRes.data ?? null);
 
-      // Fetch questions if you have a dedicated questions table
+      // Questions
       const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
       setQuestions(qRes.data ?? []);
 
@@ -67,6 +62,7 @@ const ModuleDetail: React.FC = () => {
       return;
     }
     const userId = userData.user.id;
+
     await supabase.from("user_progress").upsert([
       {
         user_id: userId,
@@ -77,6 +73,7 @@ const ModuleDetail: React.FC = () => {
         last_accessed_at: new Date().toISOString(),
       },
     ]);
+
     toast({ title: "Success", description: "Module marked complete!" });
     navigate("/modules");
   };
@@ -136,5 +133,4 @@ const ModuleDetail: React.FC = () => {
     </div>
   );
 };
-
 export default ModuleDetail;
