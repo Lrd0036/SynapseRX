@@ -182,9 +182,7 @@ const ModuleDetail = () => {
           )}
 
           {/* Render the quiz if an id exists and the module is not yet completed */}
-          {id && !progress?.completed && module.quiz_questions && (
-            <ModuleQuiz questions={module.quiz_questions} moduleId={id} onComplete={handleModuleComplete} />
-          )}
+          {id && !progress?.completed && <ModuleQuiz moduleId={id} onComplete={handleModuleComplete} />}
 
           {/* Show a completion message if the module is finished */}
           {progress?.completed && (
