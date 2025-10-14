@@ -43,37 +43,10 @@ const ModuleDetail: FC = () => {
   const [markdownContent, setMarkdownContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Parse markdown content safely
-  useEffect(() => {
-    if (!module?.content) {
-      setMarkdownContent("");
-      return;
-    }
-    try {
-      if (typeof module.content === "object" && "textContent" in module.content) {
-        setMarkdownContent(module.content.textContent);
-      } else if (typeof module.content === "string") {
-        if (module.content.trim().startsWith("{")) {
-          const parsed = JSON.parse(module.content);
-          setMarkdownContent(parsed.textContent || module.content);
-        } else {
-          setMarkdownContent(module.content);
-        }
-      } else {
-        setMarkdownContent("");
-      }
-    } catch {
-      setMarkdownContent("");
-    }
-  }, [module]);
-
-  // Fetch data
   useEffect(() => {
     if (!moduleId) return;
-
     const fetchData = async () => {
       setLoading(true);
-
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user) {
         toast({ title: "Unauthorized", description: "Please sign in.", variant: "destructive" });
@@ -82,7 +55,7 @@ const ModuleDetail: FC = () => {
       }
       const userId = userData.user.id;
 
-      // Fetch module
+      // Fetch module details
       const modRes = await supabase.from("training_modules").select("*").eq("id", moduleId).single();
       if (modRes.error || !modRes.data) {
         toast({ title: "Error", description: modRes.error?.message || "Module not found", variant: "destructive" });
@@ -91,7 +64,7 @@ const ModuleDetail: FC = () => {
       }
       setModule(modRes.data);
 
-      // Fetch user progress
+      // Fetch progress
       const progressRes = await supabase
         .from("user_progress")
         .select("completed, progress_percentage")
@@ -100,7 +73,7 @@ const ModuleDetail: FC = () => {
         .maybeSingle();
       setProgress(progressRes.data ?? null);
 
-      // Fetch questions
+      // Fetch questions and parse options JSONB
       const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
       const parsedQuestions = (qRes.data ?? []).map((q) => ({
         ...q,
@@ -108,13 +81,26 @@ const ModuleDetail: FC = () => {
       }));
       setQuestions(parsedQuestions);
 
+      // Parse markdown content if JSON object or string
+      try {
+        if (modRes.data.content) {
+          if (typeof modRes.data.content === "string") {
+            setMarkdownContent(modRes.data.content);
+          } else if (modRes.data.content.textContent) {
+            setMarkdownContent(modRes.data.content.textContent);
+          } else {
+            setMarkdownContent("");
+          }
+        }
+      } catch {
+        setMarkdownContent("");
+      }
+
       setLoading(false);
     };
-
     fetchData();
   }, [moduleId, toast]);
 
-  // Mark as complete
   const handleMarkComplete = async () => {
     const { data: userData, error: authError } = await supabase.auth.getUser();
     if (authError || !userData?.user) {
@@ -152,7 +138,7 @@ const ModuleDetail: FC = () => {
   const isCompleted = progress?.completed;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
       <Button variant="ghost" onClick={() => navigate("/modules")}>
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Modules
@@ -162,34 +148,26 @@ const ModuleDetail: FC = () => {
           <CardTitle>{module.title}</CardTitle>
           <CardDescription>{module.description}</CardDescription>
           {progress && (
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex items-center gap-3 mt-1">
               {isCompleted ? (
-                <Badge className="flex items-center gap-1 border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
-                  <CheckCircle2 className="h-4 w-4" />
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <CheckCircle2 className="h-5 w-5" />
                   Completed
                 </Badge>
               ) : (
                 <>
-                  <Progress value={progress.progress_percentage} className="w-1/3" />
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {progress.progress_percentage}% Complete
-                  </span>
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <span>{progress.progress_percentage}% Complete</span>
                 </>
               )}
             </div>
           )}
         </CardHeader>
         <CardContent>
-          {markdownContent && (
-            <div className="prose dark:prose-invert max-w-none">
-              <ReactMarkdown>{markdownContent}</ReactMarkdown>
-            </div>
-          )}
-
+          {markdownContent && <ReactMarkdown>{markdownContent}</ReactMarkdown>}
           {!isCompleted && hasQuiz && (
             <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
           )}
-
           {!isCompleted && !hasQuiz && (
             <div className="text-center space-y-4 mt-6">
               <p>This module does not have a quiz.</p>
@@ -198,9 +176,8 @@ const ModuleDetail: FC = () => {
               </Button>
             </div>
           )}
-
           {isCompleted && (
-            <div className="text-center text-green-700 p-4 border border-green-300 bg-green-50 rounded mt-6 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
+            <div className="text-center text-success p-4 border border-success rounded mt-6">
               You have completed this training module.
             </div>
           )}
