@@ -12,8 +12,14 @@ interface CompetencyRecord {
   notes: string | null;
 }
 
+interface UserMetrics {
+  progress_percent: number;
+  accuracy_rate: number;
+}
+
 const Competencies = () => {
   const [competencies, setCompetencies] = useState<CompetencyRecord[]>([]);
+  const [metrics, setMetrics] = useState<UserMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,20 +27,62 @@ const Competencies = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
-        .from("competency_records")
+      // Fetch certifications as competencies
+      const { data: certs } = await supabase
+        .from("certifications")
         .select("*")
         .eq("user_id", user.id)
-        .order("assessed_at", { ascending: false });
+        .order("issue_date", { ascending: false });
 
-      setCompetencies(data || []);
+      // Fetch user metrics for overall score
+      const { data: metricsData } = await supabase
+        .from("user_metrics")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
+      // Fetch completed modules as competencies
+      const { data: progress } = await supabase
+        .from("user_progress")
+        .select(`
+          *,
+          training_modules (
+            title
+          )
+        `)
+        .eq("user_id", user.id)
+        .eq("completed", true)
+        .order("completed_at", { ascending: false });
+
+      // Map certifications to competency format
+      const certCompetencies: CompetencyRecord[] = (certs || []).map(cert => ({
+        id: cert.id,
+        competency_name: cert.certification_name,
+        score: cert.status === 'active' ? 100 : 50,
+        assessed_at: cert.issue_date,
+        notes: `Expires: ${new Date(cert.expiration_date).toLocaleDateString()}`
+      }));
+
+      // Map completed modules to competency format
+      const moduleCompetencies: CompetencyRecord[] = (progress || []).map(prog => ({
+        id: prog.id,
+        competency_name: prog.training_modules?.title || 'Training Module',
+        score: prog.progress_percentage,
+        assessed_at: prog.completed_at || prog.last_accessed_at,
+        notes: 'Module completed'
+      }));
+
+      setCompetencies([...certCompetencies, ...moduleCompetencies]);
+      setMetrics(metricsData);
       setLoading(false);
     };
 
     fetchCompetencies();
   }, []);
 
-  const averageScore = competencies.length
+  const averageScore = metrics?.accuracy_rate 
+    ? Math.round(Number(metrics.accuracy_rate))
+    : competencies.length
     ? Math.round(
         competencies.reduce((sum, c) => sum + c.score, 0) / competencies.length
       )
