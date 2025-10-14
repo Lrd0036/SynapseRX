@@ -50,6 +50,7 @@ const ModuleDetail: FC = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [markdownContent, setMarkdownContent] = useState<string>("");
+  const [readyForQuiz, setReadyForQuiz] = useState(false);
 
   // Effect to parse module content for display
   useEffect(() => {
@@ -239,7 +240,23 @@ const ModuleDetail: FC = () => {
             </div>
           )}
 
-          {!isCompleted && hasQuiz && (
+          {!isCompleted && hasQuiz && !readyForQuiz && (
+            <div className="mt-8 p-6 border-2 border-primary/20 bg-primary/5 rounded-lg text-center space-y-4">
+              <p className="text-lg font-medium">Ready to test your knowledge?</p>
+              <p className="text-sm text-muted-foreground">
+                Make sure you've read through all the material above before starting the assessment.
+              </p>
+              <Button 
+                size="lg" 
+                onClick={() => setReadyForQuiz(true)}
+                className="w-full md:w-auto"
+              >
+                I've Read This - Continue to Quiz
+              </Button>
+            </div>
+          )}
+
+          {!isCompleted && hasQuiz && readyForQuiz && (
             <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
           )}
 
