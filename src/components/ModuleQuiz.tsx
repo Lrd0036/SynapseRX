@@ -24,7 +24,6 @@ interface ModuleQuizProps {
 
 const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete }) => {
   const { toast } = useToast();
-
   const multipleChoiceQuestions = questions.filter((q) => q.type !== "openended");
   const openEndedQuestions = questions.filter((q) => q.type === "openended");
 
@@ -46,24 +45,16 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
 
   const handleSubmitAnswer = () => {
     if (selectedAnswerIndex === null) return;
-
     const currentQuestion = multipleChoiceQuestions[currentQuestionIndex];
     const correctAnswerIndex = currentQuestion.options.indexOf(currentQuestion.correct_answer);
-
     const isCorrect = selectedAnswerIndex === correctAnswerIndex;
-
-    if (isCorrect) {
-      setScore((prev) => prev + 1);
-    }
-
+    if (isCorrect) setScore(score + 1);
     const newAnswered = [...answeredQuestions];
     newAnswered[currentQuestionIndex] = true;
     setAnsweredQuestions(newAnswered);
 
     if (currentQuestionIndex === multipleChoiceQuestions.length - 1) {
-      if (openEndedQuestions.length > 0) {
-        setShowOpenEnded(true);
-      }
+      if (openEndedQuestions.length > 0) setShowOpenEnded(true);
       setShowResults(true);
     } else {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -89,35 +80,23 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
   };
 
   const handleSubmitOpenEnded = async () => {
-    if (!moduleId) return;
-
     const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
+    if (userError || !userData.user || !moduleId) {
       toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
       return;
     }
-
     const userId = userData.user.id;
-
     const responses = Object.entries(openEndedAnswers).map(([question, response]) => ({
-      userid: userId,
-      moduleid: moduleId,
+      user_id: userId,
+      module_id: moduleId,
       question,
       response,
+      submitted_at: new Date().toISOString(),
     }));
-
-    const { error } = await supabase.from("moduleresponses").insert(responses);
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to submit open-ended responses", variant: "destructive" });
-      return;
-    }
-
+    await supabase.from("module_responses").insert(responses);
     toast({ title: "Thank you!", description: "Responses submitted successfully." });
-
     setShowOpenEnded(false);
     setOpenEndedAnswers({});
-
     if (onComplete) onComplete();
   };
 
@@ -162,7 +141,6 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
   if (showResults) {
     const percentage = Math.round((score / multipleChoiceQuestions.length) * 100);
     const passed = percentage >= 70;
-
     return (
       <Card>
         <CardHeader className="flex justify-between items-center">
@@ -216,31 +194,29 @@ const ModuleQuiz: React.FC<ModuleQuizProps> = ({ questions, moduleId, onComplete
           onValueChange={(value) => setSelectedAnswerIndex(parseInt(value))}
           disabled={isAnswered}
         >
-          {currentQuestion.options.map((option, idx) => {
-            return (
-              <div
-                key={idx}
-                className={`flex items-center gap-2 mb-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                  isAnswered
-                    ? idx === correctAnswerIndex
-                      ? "bg-green-100 border-green-500"
-                      : selectedAnswerIndex === idx
-                        ? "bg-red-100 border-red-500"
-                        : "border-gray-300"
-                    : "border-gray-300 hover:border-blue-500"
-                }`}
-              >
-                <RadioGroupItem value={idx.toString()} id={`option-${idx}`} />
-                <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer">
-                  {option}
-                </Label>
-                {isAnswered && idx === correctAnswerIndex && <CheckCircle2 className="text-green-500" />}
-                {isAnswered && selectedAnswerIndex === idx && idx !== correctAnswerIndex && (
-                  <XCircle className="text-red-500" />
-                )}
-              </div>
-            );
-          })}
+          {currentQuestion.options.map((option, idx) => (
+            <div
+              key={idx}
+              className={`flex items-center gap-2 mb-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                isAnswered
+                  ? idx === correctAnswerIndex
+                    ? "bg-green-100 border-green-500"
+                    : selectedAnswerIndex === idx
+                      ? "bg-red-100 border-red-500"
+                      : "border-gray-300"
+                  : "border-gray-300 hover:border-blue-500"
+              }`}
+            >
+              <RadioGroupItem value={idx.toString()} id={`option-${idx}`} />
+              <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer">
+                {option}
+              </Label>
+              {isAnswered && idx === correctAnswerIndex && <CheckCircle2 className="text-green-500" />}
+              {isAnswered && selectedAnswerIndex === idx && idx !== correctAnswerIndex && (
+                <XCircle className="text-red-500" />
+              )}
+            </div>
+          ))}
         </RadioGroup>
         <div className="mt-4 flex gap-4">
           {!isAnswered && (

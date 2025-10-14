@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
@@ -10,125 +10,79 @@ import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import ModuleQuiz from "../components/ModuleQuiz";
 
-interface DbQuestion {
-  id: string;
-  question_text: string;
-  options: string[];
-  correct_answer: string;
-}
-
-interface TrainingModule {
-  id: string;
-  title: string;
-  description: string;
-  content?: string;
-}
-
-interface UserProgress {
-  completed: boolean;
-  progress_percentage: number;
-}
-
 const ModuleDetail: React.FC = () => {
   const { id: moduleId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [module, setModule] = useState<TrainingModule | null>(null);
-  const [progress, setProgress] = useState<UserProgress | null>(null);
-  const [questions, setQuestions] = useState<DbQuestion[]>([]);
+  const [module, setModule] = useState<any>(null);
+  const [progress, setProgress] = useState<any>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!moduleId) {
-      setLoading(false);
-      return;
-    }
-
+    if (!moduleId) return;
     const fetchData = async () => {
       setLoading(true);
 
       const { data: userData, error: userError } = await supabase.auth.getUser();
-
       if (userError || !userData.user) {
         toast({ title: "Unauthorized", description: "Please sign in.", variant: "destructive" });
         setLoading(false);
         return;
       }
-
       const userId = userData.user.id;
 
-      const moduleRes = await supabase.from<TrainingModule>("trainingmodules").select("*").eq("id", moduleId).single();
-
-      if (moduleRes.error) {
-        toast({ title: "Error", description: moduleRes.error.message, variant: "destructive" });
+      // Fetch training module details
+      const modRes = await supabase.from("training_modules").select("*").eq("id", moduleId).single();
+      if (modRes.error || !modRes.data) {
+        toast({ title: "Error", description: modRes.error?.message || "Module not found", variant: "destructive" });
         setLoading(false);
         return;
       }
+      setModule(modRes.data);
 
-      setModule(moduleRes.data);
-
+      // Fetch user progress for module
       const progressRes = await supabase
-        .from<UserProgress>("userprogress")
+        .from("user_progress")
         .select("completed, progress_percentage")
-        .eq("userid", userId)
-        .eq("moduleid", moduleId)
+        .eq("module_id", moduleId)
+        .eq("user_id", userId)
         .maybeSingle();
+      setProgress(progressRes.data ?? null);
 
-      if (progressRes.error) {
-        toast({ title: "Error", description: progressRes.error.message, variant: "destructive" });
-      } else {
-        setProgress(progressRes.data || null);
-      }
-
-      const questionsRes = await supabase
-        .from<DbQuestion>("questions")
-        .select("id, question_text, options, correct_answer")
-        .eq("moduleid", moduleId);
-
-      if (questionsRes.error) {
-        toast({ title: "Error", description: questionsRes.error.message, variant: "destructive" });
-        setQuestions([]);
-      } else {
-        setQuestions(questionsRes.data || []);
-      }
+      // Fetch questions if you have a dedicated questions table
+      const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
+      setQuestions(qRes.data ?? []);
 
       setLoading(false);
     };
-
     fetchData();
   }, [moduleId, toast]);
 
   const handleMarkComplete = async () => {
-    if (!moduleId) return;
-
     const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
+    if (userError || !userData?.user) {
       toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
       return;
     }
-
     const userId = userData.user.id;
-
-    const { error } = await supabase.from("userprogress").upsert({
-      userid: userId,
-      moduleid: moduleId,
-      completed: true,
-      progress_percentage: 100,
-      completed_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to update progress", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Module marked complete!" });
-      navigate("/modules");
-    }
+    await supabase.from("user_progress").upsert([
+      {
+        user_id: userId,
+        module_id: moduleId,
+        completed: true,
+        progress_percentage: 100,
+        completed_at: new Date().toISOString(),
+        last_accessed_at: new Date().toISOString(),
+      },
+    ]);
+    toast({ title: "Success", description: "Module marked complete!" });
+    navigate("/modules");
   };
 
   if (loading) return <div className="p-6 text-center">Loading module...</div>;
-  if (!module) return <div className="p-6 text-center">Module not found</div>;
+  if (!module) return <div className="p-6 text-center">Module not found.</div>;
 
   const hasQuiz = questions.length > 0;
   const isCompleted = progress?.completed;
@@ -139,7 +93,6 @@ const ModuleDetail: React.FC = () => {
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Modules
       </Button>
-
       <Card>
         <CardHeader>
           <CardTitle>{module.title}</CardTitle>
@@ -162,11 +115,9 @@ const ModuleDetail: React.FC = () => {
         </CardHeader>
         <CardContent>
           {module.content && <ReactMarkdown>{module.content}</ReactMarkdown>}
-
           {!isCompleted && hasQuiz && (
             <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
           )}
-
           {!isCompleted && !hasQuiz && (
             <div className="text-center space-y-4 mt-6">
               <p>This module does not have a quiz.</p>
@@ -175,7 +126,6 @@ const ModuleDetail: React.FC = () => {
               </Button>
             </div>
           )}
-
           {isCompleted && (
             <div className="text-center text-success p-4 border border-success rounded mt-6">
               You have completed this training module.
