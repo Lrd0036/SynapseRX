@@ -1,11 +1,10 @@
-import React, { useState, FC } from "react";
+import React, { useState, FC, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { CheckCircle2, XCircle, Award } from "lucide-react";
 import { Badge } from "../components/ui/badge";
-import { supabase } from "../integrations/supabase/client";
 import { useToast } from "../hooks/use-toast";
 
 interface QuizQuestion {
@@ -35,6 +34,10 @@ const ModuleQuiz: FC<ModuleQuizProps> = ({ questions, moduleId, onComplete }) =>
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
 
+  useEffect(() => {
+    console.log("DEBUG: Quiz questions received", questions);
+  }, [questions]);
+
   const currentQuestion = multipleChoiceQuestions[currentIndex];
 
   const handleAnswerSelect = (index: number) => {
@@ -42,7 +45,10 @@ const ModuleQuiz: FC<ModuleQuizProps> = ({ questions, moduleId, onComplete }) =>
   };
 
   const handleSubmitAnswer = () => {
-    if (selectedAnswer === null) return;
+    if (selectedAnswer === null) {
+      toast({ title: "Please select an answer before submitting", description: "", variant: "destructive" });
+      return;
+    }
     const correctIndex = currentQuestion.options.findIndex((o) => o === currentQuestion.correct_answer);
     const isCorrect = selectedAnswer === correctIndex;
     if (isCorrect) setScore((s) => s + 1);
@@ -74,8 +80,7 @@ const ModuleQuiz: FC<ModuleQuizProps> = ({ questions, moduleId, onComplete }) =>
       <Card>
         <CardHeader className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
-            <Award className="h-6 w-6 text-primary" />
-            Quiz Completed!
+            <Award className="h-6 w-6 text-primary" /> Quiz Completed!
           </CardTitle>
           <Badge variant={passed ? "default" : "destructive"}>{passed ? "Passed" : "Needs Review"}</Badge>
         </CardHeader>
