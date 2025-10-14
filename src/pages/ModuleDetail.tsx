@@ -1,288 +1,72 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import React, { useEffect, useState, FC, PropsWithChildren } from "react";
+import React, { useEffect, useState, FC } from "react";
 
-// --- MOCKED DEPENDENCIES START ---
-// These are placeholders to ensure the component compiles and runs.
-// In your local environment, you would use your actual imports.
+// --- REAL DEPENDENCIES START ---
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import ModuleQuiz from "@/components/ModuleQuiz";
+// --- REAL DEPENDENCIES END ---
 
-const mockSupabase = {
-  auth: {
-    async getUser() {
-      // Simulate a logged-in user
-      return { data: { user: { id: "mock-user-123" } }, error: null };
-    },
-  },
-  from: (tableName: string) => ({
-    select: (query: string) => ({
-      eq: (column: string, value: any) => {
-        // This object simulates the Supabase query builder.
-        // It's "thenable" so it can be awaited directly by Promise.all for the questions query.
-        // It also has the .single() and .maybeSingle() methods for the other queries.
-        const queryBuilder = {
-          single: async () => {
-            await new Promise((res) => setTimeout(res, 500)); // Simulate network delay
-            if (tableName === "training_modules" && value) {
-              return {
-                data: {
-                  id: value,
-                  title: "Pharmacy Safety Fundamentals",
-                  description: "An introduction to core safety principles and procedures.",
-                  content:
-                    '{"textContent": "This module covers the essential safety protocols that must be followed in a pharmacy setting. Key topics include: \\n\\n- Handling medications safely \\n- Dispensing procedures \\n- Patient confidentiality \\n- Emergency protocols"}',
-                  order_index: 1,
-                  created_at: new Date().toISOString(),
-                },
-                error: null,
-              };
-            }
-            return { data: null, error: new Error("Not found") };
-          },
-          maybeSingle: async () => {
-            await new Promise((res) => setTimeout(res, 500));
-            if (tableName === "user_progress") {
-              return {
-                data: { completed: false, progress_percentage: 25 },
-                error: null,
-              };
-            }
-            return { data: null, error: null };
-          },
-          // This makes the object await-able for the general case (fetching multiple rows)
-          then: async (resolve: (value: { data: any[] | null; error: Error | null }) => void) => {
-            await new Promise((res) => setTimeout(res, 500));
-            if (tableName === "questions") {
-              resolve({
-                data: [
-                  {
-                    id: "q1",
-                    module_id: value,
-                    question_text: "What is the key concept of Pharmacy Safety Fundamentals?",
-                    question_type: "multiple_choice",
-                    options: ["Option A", "Option B", "Option C", "Option D"],
-                    correct_answer: "Option A",
-                    created_at: new Date().toISOString(),
-                  },
-                  {
-                    id: "q2",
-                    module_id: value,
-                    question_text: "What is the second concept?",
-                    question_type: "multiple_choice",
-                    options: ["1", "2", "3", "4"],
-                    correct_answer: "2",
-                    created_at: new Date().toISOString(),
-                  },
-                ],
-                error: null,
-              });
-            } else {
-              resolve({ data: [], error: null });
-            }
-          },
-        };
-        return queryBuilder;
-      },
-    }),
-    upsert: async (data: any, options: any) => {
-      await new Promise((res) => setTimeout(res, 500));
-      console.log("Upsert successful", data);
-      return { error: null };
-    },
-  }),
-};
-
-// Use the mock client
-const supabase = mockSupabase;
-
-// Mock Database types (in a real scenario, these would be generated from your schema)
-namespace Database {
-  export namespace public {
-    export namespace Tables {
-      export type training_modules = {
-        Row: {
-          id: string;
-          created_at: string;
-          title: string | null;
-          description: string | null;
-          content: any;
-          order_index: number | null;
-        };
-      };
-      export type user_progress = {
-        Row: {
-          completed: boolean | null;
-          progress_percentage: number | null;
-        };
-      };
-      export type questions = {
-        Row: {
-          id: string;
-          module_id: string;
-          question_text: string | null;
-          question_type: string | null;
-          options: any; // jsonb in DB
-          correct_answer: string | null;
-          created_at: string;
-        };
-      };
-    }
-  }
-}
-
-const useToast = () => ({
-  toast: (options: { title: string; description: string; variant?: string }) => {
-    console.log(`Toast: ${options.title} - ${options.description}`);
-    // A real app would have a visual toast component.
-  },
-});
-
-// Mock UI Components
-const Card: FC<PropsWithChildren & { className?: string }> = ({ children, className }) => (
-  <div className={`border rounded-lg shadow-sm bg-white dark:bg-gray-900 ${className}`}>{children}</div>
-);
-const CardHeader: FC<PropsWithChildren & { className?: string }> = ({ children }) => (
-  <div className="p-6">{children}</div>
-);
-const CardTitle: FC<PropsWithChildren & { className?: string }> = ({ children }) => (
-  <h2 className="text-2xl font-bold tracking-tight">{children}</h2>
-);
-const CardDescription: FC<PropsWithChildren & { className?: string }> = ({ children }) => (
-  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{children}</p>
-);
-const CardContent: FC<PropsWithChildren & { className?: string }> = ({ children }) => (
-  <div className="p-6 pt-0">{children}</div>
-);
-const Button: FC<PropsWithChildren & { variant?: string; size?: string; onClick?: () => void; className?: string }> = ({
-  children,
-  onClick,
-  className,
-  ...props
-}) => (
-  <button
-    onClick={onClick}
-    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-blue-600 text-white hover:bg-blue-700 h-10 py-2 px-4 ${className}`}
-    {...props}
-  >
-    {children}
-  </button>
-);
-const Progress: FC<{ value?: number; className?: string }> = ({ value = 0, className }) => (
-  <div className={`relative h-4 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 ${className}`}>
-    <div
-      className="h-full w-full flex-1 bg-blue-600 transition-all"
-      style={{ transform: `translateX(-${100 - value}%)` }}
-    ></div>
-  </div>
-);
-const Badge: FC<PropsWithChildren & { variant?: string; className?: string }> = ({ children, className }) => (
-  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${className}`}>
-    {children}
-  </span>
-);
-
-// Mock ModuleQuiz Component
-const ModuleQuiz: FC<{ questions: any[]; moduleId: string; onComplete: () => void }> = ({ questions, onComplete }) => {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-
-  const handleNext = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      onComplete();
-    }
-  };
-
-  if (!questions || questions.length === 0) return <p>No quiz questions available.</p>;
-  const question = questions[currentQuestionIndex];
-
-  return (
-    <div className="mt-6 border-t pt-6">
-      <h3 className="text-lg font-semibold tracking-tight">Assessment Quiz</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Question {currentQuestionIndex + 1} of {questions.length}
-      </p>
-      <p className="font-medium mb-4">{question.question_text}</p>
-      <div className="space-y-3">
-        {question.options &&
-          Array.isArray(question.options) &&
-          question.options.map((option: string, index: number) => (
-            <div
-              key={index}
-              className="flex items-center p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <input
-                type="radio"
-                name={`q-${question.id}`}
-                id={`${question.id}-${index}`}
-                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-              />
-              <label
-                htmlFor={`${question.id}-${index}`}
-                className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                {option}
-              </label>
-            </div>
-          ))}
-      </div>
-      <Button onClick={handleNext} className="mt-6">
-        {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Submit & Complete"}
-      </Button>
-    </div>
-  );
-};
-
-// --- MOCKED DEPENDENCIES END ---
-
+// Define types using the actual Supabase schema
 type Module = Database["public"]["Tables"]["training_modules"]["Row"];
 type UserProgress = Pick<Database["public"]["Tables"]["user_progress"]["Row"], "completed" | "progress_percentage">;
-type Question = Omit<Database["public"]["Tables"]["questions"]["Row"], "options"> & {
-  options: string[]; // ModuleQuiz expects options to be an array of strings.
-};
+
+// Note: This interface reflects the structure of the JSONB column 'quiz_questions'
+interface QuizQuestion {
+  id?: string;
+  module_id?: string;
+  question_text: string;
+  question_type: string;
+  options: string[];
+  correct_answer?: string; // For multiple choice
+  questions?: Array<{ question: string }>; // For open-ended (from schema migration)
+}
 
 const ModuleDetail: FC = () => {
-  // Hardcode the module ID to bypass the useParams hook issue in this environment.
-  const moduleId = "d2a0a2e4-8b6a-4b2c-9a3a-3e4e6f2c7a2d";
+  // Use useParams to correctly get the module ID from the URL
+  const { id: moduleId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [module, setModule] = useState<Module | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [markdownContent, setMarkdownContent] = useState<string>("");
 
+  // Effect to parse module content for display
   useEffect(() => {
     if (!module?.content) {
       setMarkdownContent("");
       return;
     }
-    try {
-      let content = module.content;
-      if (typeof content === "string" && content.trim().startsWith("{")) {
-        const parsed = JSON.parse(content);
-        if (parsed && parsed.textContent) {
-          setMarkdownContent(parsed.textContent);
-          return;
-        }
-      }
-      if (typeof content === "string") {
-        setMarkdownContent(content);
-      } else if (typeof content === "object" && content !== null && "textContent" in content) {
-        setMarkdownContent((content as { textContent: string }).textContent);
-      } else {
-        setMarkdownContent("");
-      }
-    } catch (error) {
-      setMarkdownContent(typeof module.content === "string" ? module.content : "");
-      console.error("Failed to parse module content, treating as plain text.", error);
+
+    let contentString = "";
+    if (typeof module.content === "string") {
+      contentString = module.content;
+    } else if (typeof module.content === "object" && module.content !== null && "textContent" in module.content) {
+      // Fallback for an unexpected object format
+      contentString = (module.content as { textContent: string }).textContent;
+    } else {
+      // Handle unexpected content type
+      console.error("Module content is not a string or expected object format.");
     }
+
+    // Attempt to clean up and set the content
+    setMarkdownContent(contentString);
   }, [module]);
 
   useEffect(() => {
     if (!moduleId) {
-      setLoading(false); // Ensure loading stops if there's no ID
+      setLoading(false);
+      toast({ title: "Error", description: "Module ID is missing from the URL.", variant: "destructive" });
       return;
     }
     const fetchData = async () => {
@@ -294,44 +78,65 @@ const ModuleDetail: FC = () => {
         } = await supabase.auth.getUser();
         if (userError || !user) {
           toast({ title: "Unauthorized", description: "Please sign in.", variant: "destructive" });
+          navigate("/auth");
           return;
         }
 
         const userId = user.id;
 
-        const [moduleResult, progressResult, questionsResult] = await Promise.all([
-          supabase.from("training_modules").select("*").eq("id", moduleId).single(),
-          supabase
-            .from("user_progress")
-            .select("completed, progress_percentage")
-            .eq("module_id", moduleId)
-            .eq("user_id", userId)
-            .maybeSingle(),
-          supabase.from("questions").select("*").eq("module_id", moduleId),
-        ]);
+        // Fetch Module Details
+        const { data: moduleData, error: moduleError } = await supabase
+          .from("training_modules")
+          .select("*")
+          .eq("id", moduleId)
+          .single();
 
-        if (moduleResult.error) throw moduleResult.error;
-        if (progressResult.error) throw progressResult.error;
-        if (questionsResult.error) throw questionsResult.error;
+        if (moduleError) throw new Error(`Module fetch failed: ${moduleError.message}`);
 
-        setModule(moduleResult.data);
-        setProgress(progressResult.data);
+        setModule(moduleData);
 
-        const formattedQuestions = (questionsResult.data || []).map((q) => ({
-          ...q,
-          options: Array.isArray(q.options) ? q.options : [],
-        }));
+        // Fetch User Progress
+        const { data: progressData, error: progressError } = await supabase
+          .from("user_progress")
+          .select("completed, progress_percentage")
+          .eq("module_id", moduleId)
+          .eq("user_id", userId)
+          .maybeSingle();
 
-        setQuestions(formattedQuestions as Question[]);
+        if (progressError) throw new Error(`Progress fetch failed: ${progressError.message}`);
+
+        setProgress(progressData);
+
+        // Extract Quiz Questions from JSONB column
+        const quizData = moduleData?.quiz_questions;
+        let formattedQuestions: QuizQuestion[] = [];
+
+        if (quizData && Array.isArray(quizData)) {
+          // Filter out any non-question objects if necessary, though array of objects is expected
+          formattedQuestions = quizData.filter((q) => q.question_text || q.type === "open_ended");
+        } else if (quizData && typeof quizData === "object" && quizData !== null) {
+          // Handle case where quiz_questions might be a single object containing an array of questions (e.g., if there's one open_ended block)
+          const quizQuestions = Object.values(quizData).flat();
+          formattedQuestions = quizQuestions.filter(
+            (q): q is QuizQuestion =>
+              typeof q === "object" && q !== null && (q.question_text || q.type === "open_ended"),
+          );
+        }
+
+        setQuestions(formattedQuestions);
       } catch (error) {
         console.error("Error fetching module data:", error);
-        toast({ title: "Error loading module", description: (error as Error).message, variant: "destructive" });
+        toast({
+          title: "Error loading module",
+          description: (error as Error).message || "An unknown error occurred.",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [moduleId, toast]);
+  }, [moduleId, toast, navigate]);
 
   const handleMarkComplete = async () => {
     const {
@@ -341,7 +146,8 @@ const ModuleDetail: FC = () => {
 
     if (!moduleId) return toast({ title: "Error", description: "Module ID is missing.", variant: "destructive" });
 
-    await supabase.from("user_progress").upsert(
+    // Use upsert to either update existing progress or insert a new completion record
+    const { error } = await supabase.from("user_progress").upsert(
       {
         user_id: user.id,
         module_id: moduleId,
@@ -351,6 +157,15 @@ const ModuleDetail: FC = () => {
       },
       { onConflict: "user_id,module_id" },
     );
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: `Failed to mark module complete: ${error.message}`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     toast({ title: "Success", description: "Module marked complete!" });
     navigate("/modules");
@@ -363,12 +178,8 @@ const ModuleDetail: FC = () => {
   const isCompleted = progress?.completed;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
-      <Button
-        variant="ghost"
-        onClick={() => navigate("/modules")}
-        className="bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100"
-      >
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <Button variant="ghost" onClick={() => navigate("/modules")} className="text-foreground hover:bg-muted">
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Modules
       </Button>
@@ -379,14 +190,14 @@ const ModuleDetail: FC = () => {
           {progress && (
             <div className="flex items-center gap-3 mt-4">
               {isCompleted ? (
-                <Badge className="flex items-center gap-1 border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
+                <Badge className="flex items-center gap-1 bg-success text-success-foreground">
                   <CheckCircle2 className="h-4 w-4" />
                   Completed
                 </Badge>
               ) : (
                 <>
                   <Progress value={progress.progress_percentage ?? 0} className="w-1/3" />
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  <span className="text-sm font-medium text-muted-foreground">
                     {progress.progress_percentage}% Complete
                   </span>
                 </>
@@ -402,12 +213,13 @@ const ModuleDetail: FC = () => {
           )}
 
           {!isCompleted && hasQuiz && (
-            <ModuleQuiz questions={questions as any} moduleId={module.id} onComplete={handleMarkComplete} />
+            // Note: The ModuleQuiz component correctly expects the raw questions array
+            <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
           )}
 
           {!isCompleted && !hasQuiz && (
             <div className="text-center space-y-4 mt-6">
-              <p>This module does not have a quiz.</p>
+              <p className="text-muted-foreground">This module does not have a formal assessment quiz.</p>
               <Button size="lg" onClick={handleMarkComplete}>
                 Mark as Complete
               </Button>
@@ -415,7 +227,7 @@ const ModuleDetail: FC = () => {
           )}
 
           {isCompleted && (
-            <div className="text-center text-green-700 p-4 border border-green-300 bg-green-50 rounded mt-6 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
+            <div className="text-center p-4 border border-success/50 bg-success/5 text-success rounded mt-6">
               You have completed this training module.
             </div>
           )}
