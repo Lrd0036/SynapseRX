@@ -69,9 +69,18 @@ const Insights = () => {
         }
       ]);
 
+      // Hardcoded skill gap for prototype
+      setSkillGaps([
+        {
+          id: '1',
+          title: 'Skill Gap: Compliance and Regulations',
+          description: 'Team-wide improvement needed in compliance protocols',
+          priority: 'medium'
+        }
+      ]);
+
       if (data?.insights) {
         setLearningPaths(data.insights.learningPaths || []);
-        setSkillGaps(data.insights.skillGaps || []);
         setRiskAlerts(data.insights.riskAlerts || []);
       }
 
