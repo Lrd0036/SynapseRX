@@ -9,38 +9,26 @@ import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import ModuleQuiz from "../components/ModuleQuiz";
 import React, { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
 
-// Inside your component:
+// FIX 1: Define interfaces for your data structures.
+// This provides type safety and helps TypeScript understand your data, fixing many errors.
+interface Module {
+  id: string;
+  title: string;
+  description: string;
+  content: string | { textContent: string }; // Content can be a string or a JSON object
+}
 
-const [markdownContent, setMarkdownContent] = useState<string>("");
+interface UserProgress {
+  completed: boolean;
+  progress_percentage: number;
+}
 
-useEffect(() => {
-  if (!module) return;
-
-  try {
-    // If content is JSON string, parse and extract textContent
-    const parsed = typeof module.content === "string" ? JSON.parse(module.content) : module.content;
-    if (parsed && typeof parsed === "object" && parsed.textContent) {
-      setMarkdownContent(parsed.textContent);
-    } else if (typeof module.content === "string") {
-      setMarkdownContent(module.content);
-    } else {
-      setMarkdownContent("");
-    }
-  } catch {
-    // If parsing fails, fallback to original
-    if (typeof module.content === "string") {
-      setMarkdownContent(module.content);
-    } else {
-      setMarkdownContent("");
-    }
-  }
-}, [module]);
-
-// In JSX:
-{
-  markdownContent && <ReactMarkdown>{markdownContent}</ReactMarkdown>;
+interface Question {
+  id: string;
+  module_id: string;
+  // Add any other properties your questions have from the database
+  [key: string]: any;
 }
 
 const ModuleDetail: React.FC = () => {
@@ -48,10 +36,52 @@ const ModuleDetail: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [module, setModule] = useState<any>(null);
-  const [progress, setProgress] = useState<any>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
+  // FIX 2: Use the new interfaces in your state hooks instead of `any`.
+  const [module, setModule] = useState<Module | null>(null);
+  const [progress, setProgress] = useState<UserProgress | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // FIX 3: The markdown parsing logic has been moved INSIDE the component.
+  // State and hooks can only be used within a component's body.
+  const [markdownContent, setMarkdownContent] = useState<string>("");
+
+  useEffect(() => {
+    if (!module || !module.content) {
+      setMarkdownContent("");
+      return;
+    }
+
+    try {
+      // Handle content that is already an object
+      if (typeof module.content === "object" && module.content.textContent) {
+        setMarkdownContent(module.content.textContent);
+      }
+      // Handle content that is a string
+      else if (typeof module.content === "string") {
+        // Check if it's a JSON string
+        if (module.content.trim().startsWith("{")) {
+          const parsed = JSON.parse(module.content);
+          if (parsed && parsed.textContent) {
+            setMarkdownContent(parsed.textContent);
+            return;
+          }
+        }
+        // Otherwise, use the string directly
+        setMarkdownContent(module.content);
+      } else {
+        setMarkdownContent("");
+      }
+    } catch (error) {
+      // If parsing fails, it's not valid JSON. Treat it as a plain string.
+      if (typeof module.content === "string") {
+        setMarkdownContent(module.content);
+      } else {
+        setMarkdownContent("");
+      }
+      console.error("Failed to parse module content, treating as plain text.", error);
+    }
+  }, [module]);
 
   useEffect(() => {
     if (!moduleId) return;
@@ -67,21 +97,22 @@ const ModuleDetail: React.FC = () => {
       const userId = userData.user.id;
 
       // Training module
-      const modRes = await supabase.from("training_modules").select("*").eq("id", moduleId).single();
-      setModule(modRes.data ?? null);
+      // The types we defined earlier help TypeScript infer the correct types here.
+      const { data: moduleData } = await supabase.from("training_modules").select("*").eq("id", moduleId).single();
+      setModule(moduleData);
 
       // User progress
-      const progressRes = await supabase
+      const { data: progressData } = await supabase
         .from("user_progress")
         .select("completed, progress_percentage")
         .eq("module_id", moduleId)
         .eq("user_id", userId)
         .maybeSingle();
-      setProgress(progressRes.data ?? null);
+      setProgress(progressData);
 
       // Questions
-      const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
-      setQuestions(qRes.data ?? []);
+      const { data: questionsData } = await supabase.from("questions").select("*").eq("module_id", moduleId);
+      setQuestions(questionsData ?? []);
 
       setLoading(false);
     };
@@ -96,7 +127,12 @@ const ModuleDetail: React.FC = () => {
     }
     const userId = userData.user.id;
 
-    await supabase.from("user_progress").upsert([
+    if (!moduleId) {
+      toast({ title: "Error", description: "Module ID is missing", variant: "destructive" });
+      return;
+    }
+
+    await supabase.from("user_progress").upsert(
       {
         user_id: userId,
         module_id: moduleId,
@@ -105,7 +141,8 @@ const ModuleDetail: React.FC = () => {
         completed_at: new Date().toISOString(),
         last_accessed_at: new Date().toISOString(),
       },
-    ]);
+      { onConflict: "user_id, module_id" }, // Added onConflict for safer upsert
+    );
 
     toast({ title: "Success", description: "Module marked complete!" });
     navigate("/modules");
@@ -130,13 +167,13 @@ const ModuleDetail: React.FC = () => {
           {progress && (
             <div className="flex items-center gap-3 mt-1">
               {isCompleted ? (
-                <Badge variant="outline" className="flex items-center gap-1">
+                <Badge variant="outline" className="flex items-center gap-1 border-green-500 text-green-500">
                   <CheckCircle2 className="h-5 w-5" />
                   Completed
                 </Badge>
               ) : (
                 <>
-                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <Progress value={progress.progress_percentage} className="w-1/3" />
                   <span>{progress.progress_percentage}% Complete</span>
                 </>
               )}
@@ -144,10 +181,17 @@ const ModuleDetail: React.FC = () => {
           )}
         </CardHeader>
         <CardContent>
-          {module.content && <ReactMarkdown>{module.content}</ReactMarkdown>}
+          {/* FIX 4: Use the parsed markdownContent from state here */}
+          {markdownContent && (
+            <div className="prose dark:prose-invert max-w-none">
+              <ReactMarkdown>{markdownContent}</ReactMarkdown>
+            </div>
+          )}
+
           {!isCompleted && hasQuiz && (
             <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
           )}
+
           {!isCompleted && !hasQuiz && (
             <div className="text-center space-y-4 mt-6">
               <p>This module does not have a quiz.</p>
@@ -156,8 +200,9 @@ const ModuleDetail: React.FC = () => {
               </Button>
             </div>
           )}
+
           {isCompleted && (
-            <div className="text-center text-success p-4 border border-success rounded mt-6">
+            <div className="text-center text-green-700 p-4 border border-green-300 bg-green-50 rounded mt-6">
               You have completed this training module.
             </div>
           )}
@@ -166,4 +211,5 @@ const ModuleDetail: React.FC = () => {
     </div>
   );
 };
+
 export default ModuleDetail;
