@@ -21,7 +21,6 @@ interface Module {
   title: string;
   description: string;
   content: string | { textContent: string };
-  quiz_questions?: any[];
 }
 
 interface UserProgress {
@@ -96,15 +95,7 @@ const ModuleDetail: FC = () => {
         setLoading(false);
         return;
       }
-      
-      const moduleData: Module = {
-        id: modRes.data.id,
-        title: modRes.data.title,
-        description: modRes.data.description || '',
-        content: modRes.data.content || '',
-        quiz_questions: Array.isArray(modRes.data.quiz_questions) ? modRes.data.quiz_questions : []
-      };
-      setModule(moduleData);
+      setModule(modRes.data);
 
       // Fetch user progress
       const progressRes = await supabase
@@ -115,11 +106,13 @@ const ModuleDetail: FC = () => {
         .maybeSingle();
       setProgress(progressRes.data ?? null);
 
-      // Extract quiz questions from module data
-      const quizQuestions = Array.isArray(modRes.data.quiz_questions) 
-        ? (modRes.data.quiz_questions as any[])
-        : [];
-      setQuestions(quizQuestions as Question[]);
+      // Fetch questions
+      const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
+      const parsedQuestions = (qRes.data ?? []).map(q => ({
+        ...q,
+        options: typeof q.options === "string" ? JSON.parse(q.options) : q.options,
+      }));
+      setQuestions(parsedQuestions);
 
       setLoading(false);
     };
