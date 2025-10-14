@@ -1,177 +1,111 @@
+/**
+ * src/pages/ModuleDetail.tsx
+ * * This component renders the detailed view for a single training module.
+ * It fetches module data, user progress, and displays the module content,
+ * including a video player and a quiz.
+ */
+
+// ModuleDetail.tsx (top imports)
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import supabase from "../integrations/supabaseClient";
 import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import Button from "../components/ui/button";
-import Progress from "../components/ui/progress";
+import { Button } from "../components/ui/button";
+import { Progress } from "../components/ui/progress";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import useToast from "../hooks/use-toast";
-import ModuleQuiz from "./ModuleQuiz";
+import { useToast } from "../hooks/use-toast";
+import ModuleQuiz from "../components/ModuleQuiz";
 
-interface DbQuestion {
-  id: string;
-  question_text: string;
-  options: string[];
-  correct_answer: string;
-}
-
-interface FormattedQuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: number;
-}
-
-interface TrainingModule {
-  id: string;
-  title: string;
-  description: string;
-  content?: any;
-}
-
-interface UserProgress {
-  completed: boolean;
-  progress_percentage: number;
-}
-
-const ModuleDetail: React.FC = () => {
-  const { id: moduleId } = useParams<{ id: string }>();
+// Define the ModuleDetail functional component
+const ModuleDetail = () => {
+  // Get the module 'id' from the URL parameters
+  const { id } = useParams();
+  // Hook for programmatic navigation
   const navigate = useNavigate();
-  const toast = useToast();
+  // Hook to display toast notifications
+  const { toast } = useToast();
 
-  const [module, setModule] = useState<TrainingModule | null>(null);
-  const [progress, setProgress] = useState<UserProgress | null>(null);
-  const [quizQuestions, setQuizQuestions] = useState<FormattedQuizQuestion[]>([]);
+  // State to hold the module data
+  const [module, setModule] = useState<any>(null);
+  // State to hold the user's progress for this module
+  const [progress, setProgress] = useState<any>(null);
+  // State to manage the loading status
   const [loading, setLoading] = useState(true);
 
+  // useEffect hook to fetch module and progress data when the component mounts or 'id' changes
   useEffect(() => {
-    if (!moduleId) {
-      setLoading(false);
-      return;
-    }
+    const fetchModuleData = async () => {
+      // Get the current logged-in user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return; // Exit if no user is logged in
 
-    const fetchData = async () => {
-      setLoading(true);
+      // Fetch the specific module from the 'training_modules' table
+      const { data: moduleData } = await supabase.from("training_modules").select("*").eq("id", id).single();
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) {
-        toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
+      // Fetch the user's progress for this module
+      const { data: progressData } = await supabase
+        .from("user_progress")
+        .select("*")
+        .eq("module_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle(); // Use maybeSingle() as progress might not exist yet
 
-      const userId = userData.user.id;
-
-      const [moduleRes, progressRes, questionsRes] = await Promise.all([
-        supabase
-          .from<TrainingModule>("trainingmodules")
-          .select("id, title, description, content")
-          .eq("id", moduleId)
-          .single(),
-        supabase
-          .from<UserProgress>("userprogress")
-          .select("completed, progress_percentage")
-          .eq("moduleid", moduleId)
-          .eq("userid", userId)
-          .maybeSingle(),
-        supabase
-          .from<DbQuestion>("questions")
-          .select("id, question_text, options, correct_answer")
-          .eq("moduleid", moduleId),
-      ]);
-
-      if (moduleRes.error) {
-        toast({ title: "Error", description: moduleRes.error.message, variant: "destructive" });
-      } else {
-        setModule(moduleRes.data);
-      }
-
-      if (progressRes.error) {
-        toast({ title: "Error", description: progressRes.error.message, variant: "destructive" });
-      } else {
-        setProgress(progressRes.data || null);
-      }
-
-      if (questionsRes.error) {
-        toast({ title: "Error", description: questionsRes.error.message, variant: "destructive" });
-        setQuizQuestions([]);
-      } else {
-        // Format questions safely
-        const formatted = questionsRes.data
-          ?.map((q) => {
-            // options stored as JSON string or array
-            const options = Array.isArray(q.options) ? q.options : JSON.parse(q.options as unknown as string);
-
-            // find index of correct answer string
-            const correctIndex = options.findIndex((opt) => opt === q.correct_answer);
-            if (correctIndex === -1) return null;
-
-            return {
-              question: q.question_text,
-              options: options,
-              correctAnswer: correctIndex,
-            };
-          })
-          .filter((q): q is FormattedQuizQuestion => q !== null);
-
-        setQuizQuestions(formatted || []);
-      }
-
-      setLoading(false);
+      // Update state with the fetched data
+      setModule(moduleData);
+      setProgress(progressData);
+      setLoading(false); // Set loading to false after data is fetched
     };
 
-    fetchData();
-  }, [moduleId, toast]);
+    fetchModuleData();
+  }, [id]); // Dependency array ensures this runs again if the module id changes
 
+  /**
+   * Handles marking the module as complete after the user finishes the quiz.
+   * This function is passed as a prop to the ModuleQuiz component.
+   */
   const handleModuleComplete = async () => {
-    if (!moduleId) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
-      return;
-    }
-    const userId = userData.user.id;
-
-    const { error } = await supabase.from("userprogress").upsert({
-      userid: userId,
-      moduleid: moduleId,
+    // Insert or update the user's progress in the 'user_progress' table
+    const { error } = await supabase.from("user_progress").upsert({
+      user_id: user.id,
+      module_id: id,
       completed: true,
       progress_percentage: 100,
       completed_at: new Date().toISOString(),
     });
 
+    // If there's an error, show a destructive toast notification
     if (error) {
-      toast({ title: "Error", description: "Failed to save progress", variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Progress saved successfully" });
+      toast({
+        title: "Error",
+        description: "Failed to mark module as complete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // On success, redirect the user back to the modules list after a short delay
+    setTimeout(() => {
       navigate("/modules");
-    }
+    }, 1500);
   };
 
-  if (loading) return <div className="p-6 text-center">Loading module...</div>;
-  if (!module) return <div className="p-6 text-center">Module not found.</div>;
+  // Display a loading message while data is being fetched
+  if (loading || !module) {
+    return <div className="p-6">Loading...</div>;
+  }
 
-  const hasQuiz = quizQuestions.length > 0;
-
-  // Optional: parse module content - e.g. markdown and video supported
-  const parseModuleContent = (content: any) => {
-    if (!content) return { videoUrl: null, textContent: null };
-    try {
-      const parsed = typeof content === "string" ? JSON.parse(content) : content;
-      return {
-        videoUrl: parsed.videoUrl || null,
-        textContent: parsed.textContent || null,
-      };
-    } catch {
-      return { videoUrl: null, textContent: content };
-    }
-  };
-
-  const { videoUrl, textContent } = parseModuleContent(module.content);
-
+  // Render the component's UI
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      {/* Back button to navigate to the main modules page */}
       <Button variant="ghost" onClick={() => navigate("/modules")}>
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Modules
@@ -179,47 +113,78 @@ const ModuleDetail: React.FC = () => {
 
       <Card className="shadow-elevated">
         <CardHeader>
-          <CardTitle className="text-2xl">{module.title}</CardTitle>
-          <CardDescription>{module.description}</CardDescription>
-          {progress && (
-            <div className="flex items-center gap-2 mt-2">
-              {progress.completed ? (
-                <CheckCircle2 className="text-success h-8 w-8" />
-              ) : (
-                <Progress value={progress.progress_percentage} />
-              )}
-              <span>{progress.progress_percentage}% Complete</span>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <CardTitle className="text-2xl mb-2">{module.title}</CardTitle>
+              <CardDescription className="text-base">{module.description}</CardDescription>
+            </div>
+            {/* Show a checkmark if the module is completed */}
+            {progress?.completed && <CheckCircle2 className="h-8 w-8 text-success flex-shrink-0" />}
+          </div>
+
+          <div className="flex items-center gap-4 pt-4">
+            <Badge>{module.category}</Badge>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>{module.duration_minutes} minutes</span>
+            </div>
+          </div>
+
+          {/* Display progress bar if the module is in progress */}
+          {progress && !progress.completed && (
+            <div className="space-y-2 pt-4">
+              <div className="flex items-center justify-between text-sm">
+                <span>Your Progress</span>
+                <span className="font-medium">{progress.progress_percentage}%</span>
+              </div>
+              <Progress value={progress.progress_percentage} className="h-2" />
             </div>
           )}
         </CardHeader>
 
-        <CardContent>
-          {videoUrl && (
-            <video controls className="w-full aspect-video rounded-lg bg-muted" src={videoUrl}>
-              Your browser does not support the video tag.
-            </video>
-          )}
-
-          {textContent && <ReactMarkdown>{textContent}</ReactMarkdown>}
-
-          {hasQuiz && !progress?.completed && (
-            <ModuleQuiz questions={quizQuestions} moduleId={module.id} onComplete={handleModuleComplete} />
-          )}
-
-          {!hasQuiz && !progress?.completed && (
-            <div className="p-4 border-2 border-dashed rounded-lg text-center text-muted">
-              This module does not have a quiz.
-              <Button onClick={handleModuleComplete} className="mt-4" size="lg">
-                Mark as Complete
-              </Button>
+        <CardContent className="space-y-6">
+          {/* Render video player if a video URL is available */}
+          {module.video_url && (
+            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+              <video className="w-full h-full object-cover" controls preload="metadata">
+                <source src={module.video_url} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
             </div>
           )}
 
+          {/* Render module content using ReactMarkdown, or show default text */}
+          {module.content ? (
+            <div className="prose dark:prose-invert max-w-none">
+              <ReactMarkdown>{module.content}</ReactMarkdown>
+            </div>
+          ) : (
+            <div className="prose dark:prose-invert max-w-none">
+              <h3>Learning Objectives</h3>
+              <ul>
+                <li>Understand key concepts and principles</li>
+                <li>Apply knowledge to real-world scenarios</li>
+                <li>Demonstrate competency in practical skills</li>
+                <li>Meet certification requirements</li>
+              </ul>
+              <h3>Course Content</h3>
+              <p>
+                This comprehensive training module covers essential topics required for pharmacy technician
+                certification. Each section is designed to build upon previous knowledge and provide practical,
+                actionable skills you can immediately apply in a pharmacy setting.
+              </p>
+            </div>
+          )}
+
+          {/* Render the quiz if an id exists and the module is not yet completed */}
+          {id && !progress?.completed && <ModuleQuiz moduleId={id} onComplete={handleModuleComplete} />}
+
+          {/* Show a completion message if the module is finished */}
           {progress?.completed && (
-            <div className="text-success p-6 bg-success/10 rounded-lg text-center">
-              <CheckCircle2 className="mx-auto mb-3 h-12 w-12" />
-              <h3 className="text-lg font-semibold">Module Completed</h3>
-              <p>You have successfully completed this training module.</p>
+            <div className="bg-success/10 border border-success p-6 rounded-lg text-center">
+              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-success mb-2">Module Completed</h3>
+              <p className="text-muted-foreground">You have successfully completed this training module.</p>
             </div>
           )}
         </CardContent>
@@ -228,4 +193,5 @@ const ModuleDetail: React.FC = () => {
   );
 };
 
+// Export the component for use in other parts of the application
 export default ModuleDetail;
