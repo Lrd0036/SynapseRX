@@ -59,8 +59,17 @@ const Insights = () => {
 
       if (error) throw error;
 
+      // Hardcoded coaching tip for prototype
+      setCoachingTips([
+        {
+          id: '1',
+          title: 'Lance Dye - Inactive Learner',
+          description: "Hasn't completed training in 12 days. Schedule sit-down?",
+          priority: 'high'
+        }
+      ]);
+
       if (data?.insights) {
-        setCoachingTips(data.insights.coachingTips || []);
         setLearningPaths(data.insights.learningPaths || []);
         setSkillGaps(data.insights.skillGaps || []);
         setRiskAlerts(data.insights.riskAlerts || []);
