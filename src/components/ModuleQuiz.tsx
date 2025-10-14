@@ -9,13 +9,13 @@ import { Badge } from "../components/ui/badge";
 import { useToast } from "../hooks/use-toast";
 
 interface QuizQuestion {
-  id?: string;
-  module_id?: string;
+  id: string;
+  module_id: string;
   question_text: string;
   question_type: string;
   options: string[];
   correct_answer: string;
-  created_at?: string;
+  created_at: string;
 }
 
 interface ModuleQuizProps {
