@@ -16,38 +16,42 @@ const mockSupabase = {
   },
   from: (tableName: string) => ({
     select: (query: string) => ({
-      eq: (column: string, value: any) => ({
-        single: async () => {
-          await new Promise((res) => setTimeout(res, 500)); // Simulate network delay
-          if (tableName === "training_modules" && value) {
-            return {
-              data: {
-                id: value,
-                title: "Pharmacy Safety Fundamentals",
-                description: "An introduction to core safety principles and procedures.",
-                content:
-                  '{"textContent": "This module covers the essential safety protocols that must be followed in a pharmacy setting. Key topics include: \\n\\n- Handling medications safely \\n- Dispensing procedures \\n- Patient confidentiality \\n- Emergency protocols"}',
-                order_index: 1,
-                created_at: new Date().toISOString(),
-              },
-              error: null,
-            };
-          }
-          return { data: null, error: new Error("Not found") };
-        },
-        maybeSingle: async () => {
-          await new Promise((res) => setTimeout(res, 500));
-          if (tableName === "user_progress") {
-            return {
-              data: { completed: false, progress_percentage: 25 },
-              error: null,
-            };
-          }
-          return { data: null, error: null };
-        },
-        // This is a simplified mock for the query that fetches questions
-        then(resolve: (value: { data: any[] | null; error: Error | null }) => void) {
-          new Promise((res) => setTimeout(res, 500)).then(() => {
+      eq: (column: string, value: any) => {
+        // This object simulates the Supabase query builder.
+        // It's "thenable" so it can be awaited directly by Promise.all for the questions query.
+        // It also has the .single() and .maybeSingle() methods for the other queries.
+        const queryBuilder = {
+          single: async () => {
+            await new Promise((res) => setTimeout(res, 500)); // Simulate network delay
+            if (tableName === "training_modules" && value) {
+              return {
+                data: {
+                  id: value,
+                  title: "Pharmacy Safety Fundamentals",
+                  description: "An introduction to core safety principles and procedures.",
+                  content:
+                    '{"textContent": "This module covers the essential safety protocols that must be followed in a pharmacy setting. Key topics include: \\n\\n- Handling medications safely \\n- Dispensing procedures \\n- Patient confidentiality \\n- Emergency protocols"}',
+                  order_index: 1,
+                  created_at: new Date().toISOString(),
+                },
+                error: null,
+              };
+            }
+            return { data: null, error: new Error("Not found") };
+          },
+          maybeSingle: async () => {
+            await new Promise((res) => setTimeout(res, 500));
+            if (tableName === "user_progress") {
+              return {
+                data: { completed: false, progress_percentage: 25 },
+                error: null,
+              };
+            }
+            return { data: null, error: null };
+          },
+          // This makes the object await-able for the general case (fetching multiple rows)
+          then: async (resolve: (value: { data: any[] | null; error: Error | null }) => void) => {
+            await new Promise((res) => setTimeout(res, 500));
             if (tableName === "questions") {
               resolve({
                 data: [
@@ -75,9 +79,10 @@ const mockSupabase = {
             } else {
               resolve({ data: [], error: null });
             }
-          });
-        },
-      }),
+          },
+        };
+        return queryBuilder;
+      },
     }),
     upsert: async (data: any, options: any) => {
       await new Promise((res) => setTimeout(res, 500));
