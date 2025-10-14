@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
@@ -9,6 +8,40 @@ import { Badge } from "../components/ui/badge";
 import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import ModuleQuiz from "../components/ModuleQuiz";
+import React, { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+
+// Inside your component:
+
+const [markdownContent, setMarkdownContent] = useState<string>("");
+
+useEffect(() => {
+  if (!module) return;
+
+  try {
+    // If content is JSON string, parse and extract textContent
+    const parsed = typeof module.content === "string" ? JSON.parse(module.content) : module.content;
+    if (parsed && typeof parsed === "object" && parsed.textContent) {
+      setMarkdownContent(parsed.textContent);
+    } else if (typeof module.content === "string") {
+      setMarkdownContent(module.content);
+    } else {
+      setMarkdownContent("");
+    }
+  } catch {
+    // If parsing fails, fallback to original
+    if (typeof module.content === "string") {
+      setMarkdownContent(module.content);
+    } else {
+      setMarkdownContent("");
+    }
+  }
+}, [module]);
+
+// In JSX:
+{
+  markdownContent && <ReactMarkdown>{markdownContent}</ReactMarkdown>;
+}
 
 const ModuleDetail: React.FC = () => {
   const { id: moduleId } = useParams<{ id: string }>();
