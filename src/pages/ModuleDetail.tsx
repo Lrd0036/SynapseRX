@@ -33,6 +33,7 @@ interface TrainingModule {
   duration_minutes: number;
   video_url?: string;
   content?: string;
+  quiz_questions?: any;
 }
 
 interface UserProgress {
@@ -203,11 +204,18 @@ const ModuleDetail = () => {
             The quiz will only appear if:
             1. A `moduleId` exists in the URL.
             2. The user's progress for this module is NOT marked as `completed: true`.
+            3. The module has quiz_questions defined.
             
             If the quiz isn't showing up, check your 'user_progress' table in Supabase
             to make sure the 'completed' column is false or the row doesn't exist.
           */}
-          {moduleId && !progress?.completed && <ModuleQuiz moduleId={moduleId} onComplete={handleModuleComplete} />}
+          {moduleId && !progress?.completed && module.quiz_questions && Array.isArray(module.quiz_questions) && (
+            <ModuleQuiz 
+              questions={module.quiz_questions} 
+              moduleId={moduleId} 
+              onComplete={handleModuleComplete} 
+            />
+          )}
 
           {progress?.completed && (
             <div className="bg-success/10 border border-success p-6 rounded-lg text-center">
