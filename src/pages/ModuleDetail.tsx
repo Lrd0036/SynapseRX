@@ -28,12 +28,15 @@ interface UserProgress {
   progress_percentage: number;
 }
 
-// Interface for quiz questions from JSONB field in training_modules
+// Interface for quiz questions from separate questions table
 interface QuizQuestion {
+  id: string;
+  module_id: string;
   question_text: string;
   question_type: string;
   options: string[];
   correct_answer: string;
+  created_at: string;
 }
 
 const ModuleDetail: FC = () => {
@@ -114,19 +117,29 @@ const ModuleDetail: FC = () => {
 
         setProgress(progressData);
 
-        // Extract quiz questions from module's quiz_questions JSONB field
-        if (moduleData?.quiz_questions) {
-          try {
-            const quizData = Array.isArray(moduleData.quiz_questions) 
-              ? moduleData.quiz_questions 
-              : JSON.parse(moduleData.quiz_questions as string);
-            setQuestions(quizData || []);
-          } catch (error) {
-            console.error("Error parsing quiz questions:", error);
-            setQuestions([]);
-          }
-        } else {
+        // Fetch Quiz Questions from separate questions table
+        // Using 'as any' because questions table exists in external Supabase but not in auto-generated types
+        const { data: questionsData, error: questionsError } = await (supabase as any)
+          .from("questions")
+          .select("*")
+          .eq("module_id", moduleId)
+          .order("created_at", { ascending: true });
+
+        if (questionsError) {
+          console.error("Error fetching questions:", questionsError);
           setQuestions([]);
+        } else {
+          // Parse options from JSONB and map to QuizQuestion type
+          const parsedQuestions: QuizQuestion[] = (questionsData || []).map((q: any) => ({
+            id: q.id,
+            module_id: q.module_id,
+            question_text: q.question_text,
+            question_type: q.question_type,
+            options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
+            correct_answer: q.correct_answer || '',
+            created_at: q.created_at
+          }));
+          setQuestions(parsedQuestions);
         }
       } catch (error) {
         console.error("Error fetching module data:", error);
