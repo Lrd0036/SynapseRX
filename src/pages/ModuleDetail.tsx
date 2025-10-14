@@ -7,9 +7,6 @@ import React, { useEffect, useState, FC, PropsWithChildren } from "react";
 // These are placeholders to ensure the component compiles and runs.
 // In your local environment, you would use your actual imports.
 
-// Mock the useParams hook directly to provide a module ID
-const useParams = () => ({ id: "d2a0a2e4-8b6a-4b2c-9a3a-3e4e6f2c7a2d" });
-
 const mockSupabase = {
   auth: {
     async getUser() {
@@ -245,7 +242,8 @@ type Question = Omit<Database["public"]["Tables"]["questions"]["Row"], "options"
 };
 
 const ModuleDetail: FC = () => {
-  const { id: moduleId } = useParams();
+  // Hardcode the module ID to bypass the useParams hook issue in this environment.
+  const moduleId = "d2a0a2e4-8b6a-4b2c-9a3a-3e4e6f2c7a2d";
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -283,7 +281,10 @@ const ModuleDetail: FC = () => {
   }, [module]);
 
   useEffect(() => {
-    if (!moduleId) return;
+    if (!moduleId) {
+      setLoading(false); // Ensure loading stops if there's no ID
+      return;
+    }
     const fetchData = async () => {
       setLoading(true);
       try {
