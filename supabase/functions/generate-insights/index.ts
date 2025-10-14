@@ -306,14 +306,22 @@ Format as a numbered list.`;
       }
     );
   } catch (error) {
-    console.error("Error in generate-insights:", error);
+    // Log full error details server-side only
+    console.error('Error in generate-insights:', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Return generic message to client
     return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+      JSON.stringify({ 
+        error: 'Failed to generate insights. Please try again or contact support if the issue persists.',
+        code: 'INSIGHTS_ERROR'
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }
