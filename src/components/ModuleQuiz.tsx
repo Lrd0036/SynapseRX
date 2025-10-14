@@ -1,14 +1,14 @@
 // Import necessary React hooks and components.
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 import { CheckCircle2, XCircle, Award } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { Badge } from "./ui/badge";
+import { supabase } from "../integrations/supabase/client";
+import { useToast } from "../hooks/use-toast";
 
 // Define the structure for a multiple-choice question.
 interface QuizQuestion {
