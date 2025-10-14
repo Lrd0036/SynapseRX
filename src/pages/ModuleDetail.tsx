@@ -19,8 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// Import the custom quiz component
-import ModuleQuiz from "@/components/ModuleQuiz";
+// Import the custom quiz component using a named import
+import { ModuleQuiz } from "@/components/ModuleQuiz";
 
 // Define the ModuleDetail functional component
 const ModuleDetail = () => {
@@ -181,7 +181,7 @@ const ModuleDetail = () => {
             </div>
           )}
 
-          {/* Render the quiz if questions exist and the module is not yet completed */}
+          {/* Render the quiz if an id exists and the module is not yet completed */}
           {id && !progress?.completed && <ModuleQuiz moduleId={id} onComplete={handleModuleComplete} />}
 
           {/* Show a completion message if the module is finished */}
