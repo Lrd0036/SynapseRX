@@ -144,6 +144,10 @@ const ModuleDetail: FC = () => {
     fetchData();
   }, [moduleId, toast, navigate]);
 
+  // src/pages/ModuleDetail.tsx
+
+  // ... (lines 142 to 167 contain the handleMarkComplete logic)
+
   const handleMarkComplete = async () => {
     const {
       data: { user },
@@ -165,9 +169,13 @@ const ModuleDetail: FC = () => {
     );
 
     if (error) {
+      // --- ENHANCED ERROR LOGGING ---
+      console.error("Supabase Progress Update Error:", error);
+
+      // Use the error message directly to help diagnose
       toast({
-        title: "Error",
-        description: `Failed to mark module complete: ${error.message}`,
+        title: "Failed to Save Progress",
+        description: `Error: ${error.message}. Please check console for details.`,
         variant: "destructive",
       });
       return;
@@ -176,6 +184,8 @@ const ModuleDetail: FC = () => {
     toast({ title: "Success", description: "Module marked complete!" });
     navigate("/modules");
   };
+
+  // ...
 
   if (loading) return <div className="p-6 text-center">Loading module...</div>;
   if (!module) return <div className="p-6 text-center">Module not found.</div>;
