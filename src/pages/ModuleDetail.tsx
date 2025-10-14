@@ -18,15 +18,15 @@ import ModuleQuiz from "@/components/ModuleQuiz";
 type Module = Database["public"]["Tables"]["training_modules"]["Row"];
 type UserProgress = Pick<Database["public"]["Tables"]["user_progress"]["Row"], "completed" | "progress_percentage">;
 
-// Note: This interface reflects the structure of the JSONB column 'quiz_questions'
+// Interface for questions from the questions table
 interface QuizQuestion {
-  id?: string;
-  module_id?: string;
+  id: string;
+  module_id: string;
   question_text: string;
   question_type: string;
   options: string[];
-  correct_answer?: string; // For multiple choice
-  questions?: Array<{ question: string }>; // For open-ended (from schema migration)
+  correct_answer: string;
+  created_at: string;
 }
 
 const ModuleDetail: FC = () => {
@@ -107,23 +107,19 @@ const ModuleDetail: FC = () => {
 
         setProgress(progressData);
 
-        // Extract Quiz Questions from JSONB column
-        const quizData = moduleData?.quiz_questions;
-        let formattedQuestions: QuizQuestion[] = [];
+        // Fetch Quiz Questions from separate questions table
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("module_id", moduleId)
+          .order("created_at", { ascending: true });
 
-        if (quizData && Array.isArray(quizData)) {
-          // Filter out any non-question objects if necessary, though array of objects is expected
-          formattedQuestions = quizData.filter((q) => q.question_text || q.type === "open_ended");
-        } else if (quizData && typeof quizData === "object" && quizData !== null) {
-          // Handle case where quiz_questions might be a single object containing an array of questions (e.g., if there's one open_ended block)
-          const quizQuestions = Object.values(quizData).flat();
-          formattedQuestions = quizQuestions.filter(
-            (q): q is QuizQuestion =>
-              typeof q === "object" && q !== null && (q.question_text || q.type === "open_ended"),
-          );
+        if (questionsError) {
+          console.error("Error fetching questions:", questionsError);
+          setQuestions([]);
+        } else {
+          setQuestions(questionsData || []);
         }
-
-        setQuestions(formattedQuestions);
       } catch (error) {
         console.error("Error fetching module data:", error);
         toast({
@@ -213,7 +209,6 @@ const ModuleDetail: FC = () => {
           )}
 
           {!isCompleted && hasQuiz && (
-            // Note: The ModuleQuiz component correctly expects the raw questions array
             <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
           )}
 

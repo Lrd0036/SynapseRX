@@ -1,20 +1,18 @@
-import React, { useState, FC, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
-import { Label } from "../components/ui/label";
-import { CheckCircle2, XCircle, Award } from "lucide-react";
-import { Badge } from "../components/ui/badge";
-import { useToast } from "../hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Label } from "./ui/label";
+import { Badge } from "./ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface QuizQuestion {
-  id: string;
-  module_id: string;
+  id?: string;
+  module_id?: string;
   question_text: string;
   question_type: string;
   options: string[];
-  correct_answer: string;
-  created_at: string;
+  correct_answer?: string;
+  created_at?: string;
 }
 
 interface ModuleQuizProps {
