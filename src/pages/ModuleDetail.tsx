@@ -79,6 +79,9 @@ const ModuleDetail: FC = () => {
         ...q,
         options: typeof q.options === "string" ? JSON.parse(q.options) : q.options,
       }));
+
+      console.log("DEBUG: Fetched questions with parsed options:", parsedQuestions);
+
       setQuestions(parsedQuestions);
 
       // Parse markdown content if JSON object or string
@@ -127,12 +130,8 @@ const ModuleDetail: FC = () => {
     navigate("/modules");
   };
 
-  if (loading) {
-    return <div className="p-6 text-center">Loading module...</div>;
-  }
-  if (!module) {
-    return <div className="p-6 text-center">Module not found.</div>;
-  }
+  if (loading) return <div className="p-6 text-center">Loading module...</div>;
+  if (!module) return <div className="p-6 text-center">Module not found.</div>;
 
   const hasQuiz = questions.length > 0;
   const isCompleted = progress?.completed;
