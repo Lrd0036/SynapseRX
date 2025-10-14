@@ -2,13 +2,7 @@ import React, { useEffect, useState, FC } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
@@ -108,7 +102,7 @@ const ModuleDetail: FC = () => {
 
       // Fetch questions
       const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
-      const parsedQuestions = (qRes.data ?? []).map(q => ({
+      const parsedQuestions = (qRes.data ?? []).map((q) => ({
         ...q,
         options: typeof q.options === "string" ? JSON.parse(q.options) : q.options,
       }));
@@ -132,14 +126,16 @@ const ModuleDetail: FC = () => {
       return;
     }
 
-    await supabase.from("user_progress").upsert([{
-      user_id: userData.user.id,
-      module_id: moduleId,
-      completed: true,
-      progress_percentage: 100,
-      completed_at: new Date().toISOString(),
-      last_accessed_at: new Date().toISOString(),
-    }]);
+    await supabase.from("user_progress").upsert([
+      {
+        user_id: userData.user.id,
+        module_id: moduleId,
+        completed: true,
+        progress_percentage: 100,
+        completed_at: new Date().toISOString(),
+        last_accessed_at: new Date().toISOString(),
+      },
+    ]);
 
     toast({ title: "Success", description: "Module marked complete!" });
     navigate("/modules");
