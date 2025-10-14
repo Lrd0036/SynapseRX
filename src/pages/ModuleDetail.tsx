@@ -35,8 +35,7 @@ const ModuleDetail: React.FC = () => {
 
       // Training module
       const modRes = await supabase.from("training_modules").select("*").eq("id", moduleId).single();
-      const moduleData = modRes.data ?? null;
-      setModule(moduleData);
+      setModule(modRes.data ?? null);
 
       // User progress
       const progressRes = await supabase
@@ -47,8 +46,9 @@ const ModuleDetail: React.FC = () => {
         .maybeSingle();
       setProgress(progressRes.data ?? null);
 
-      // Questions from module's quiz_questions field
-      setQuestions(Array.isArray(moduleData?.quiz_questions) ? moduleData.quiz_questions : []);
+      // Questions
+      const qRes = await supabase.from("questions").select("*").eq("module_id", moduleId);
+      setQuestions(qRes.data ?? []);
 
       setLoading(false);
     };
