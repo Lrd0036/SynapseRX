@@ -1,11 +1,3 @@
-/**
- * src/pages/ModuleDetail.tsx
- * * This component renders the detailed view for a single training module.
- * It fetches module data, user progress, and displays the module content,
- * including a video player and a quiz.
- */
-
-// ModuleDetail.tsx (top imports)
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import supabase from "../integrations/supabaseClient";
@@ -13,178 +5,189 @@ import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Badge } from "../components/ui/badge";
+import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import ModuleQuiz from "../components/ModuleQuiz";
 
-// Define the ModuleDetail functional component
-const ModuleDetail = () => {
-  // Get the module 'id' from the URL parameters
-  const { id } = useParams();
-  // Hook for programmatic navigation
+interface DbQuestion {
+  id: string;
+  question_text: string;
+  options: string[]; // assuming options stored as string array
+  correct_answer: string;
+}
+
+interface TrainingModule {
+  id: string;
+  title: string;
+  description: string;
+  content?: string; // markdown or JSON string content
+}
+
+interface UserProgress {
+  completed: boolean;
+  progress_percentage: number;
+}
+
+const ModuleDetail: React.FC = () => {
+  const { id: moduleId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  // Hook to display toast notifications
-  const { toast } = useToast();
+  const toast = useToast();
 
-  // State to hold the module data
-  const [module, setModule] = useState<any>(null);
-  // State to hold the user's progress for this module
-  const [progress, setProgress] = useState<any>(null);
-  // State to manage the loading status
-  const [loading, setLoading] = useState(true);
+  const [module, setModule] = useState<TrainingModule | null>(null);
+  const [progress, setProgress] = useState<UserProgress | null>(null);
+  const [questions, setQuestions] = useState<DbQuestion[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // useEffect hook to fetch module and progress data when the component mounts or 'id' changes
   useEffect(() => {
-    const fetchModuleData = async () => {
-      // Get the current logged-in user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return; // Exit if no user is logged in
+    if (!moduleId) {
+      setLoading(false);
+      return;
+    }
 
-      // Fetch the specific module from the 'training_modules' table
-      const { data: moduleData } = await supabase.from("training_modules").select("*").eq("id", id).single();
+    const fetchData = async () => {
+      setLoading(true);
 
-      // Fetch the user's progress for this module
-      const { data: progressData } = await supabase
-        .from("user_progress")
-        .select("*")
-        .eq("module_id", id)
-        .eq("user_id", user.id)
-        .maybeSingle(); // Use maybeSingle() as progress might not exist yet
+      // Get authenticated user ID
+      const { data: userData, error: userError } = await supabase.auth.getUser();
 
-      // Update state with the fetched data
-      setModule(moduleData);
-      setProgress(progressData);
-      setLoading(false); // Set loading to false after data is fetched
+      if (userError || !userData.user) {
+        toast({ title: "Unauthorized", description: "You must be signed in.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      const userId = userData.user.id;
+
+      // Fetch module details
+      const moduleRes = await supabase.from<TrainingModule>("trainingmodules").select("*").eq("id", moduleId).single();
+
+      if (moduleRes.error || !moduleRes.data) {
+        toast({
+          title: "Error",
+          description: moduleRes.error?.message || "Failed to load module",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      setModule(moduleRes.data);
+
+      // Fetch user progress
+      const progressRes = await supabase
+        .from<UserProgress>("userprogress")
+        .select("completed, progress_percentage")
+        .eq("userid", userId)
+        .eq("moduleid", moduleId)
+        .maybeSingle();
+
+      if (progressRes.error) {
+        toast({ title: "Error", description: progressRes.error.message, variant: "destructive" });
+      } else {
+        setProgress(progressRes.data || null);
+      }
+
+      // Fetch quiz questions
+      const questionsRes = await supabase
+        .from<DbQuestion>("questions")
+        .select("id, question_text, options, correct_answer")
+        .eq("moduleid", moduleId);
+
+      if (questionsRes.error) {
+        toast({ title: "Error", description: questionsRes.error.message, variant: "destructive" });
+        setQuestions([]);
+      } else {
+        setQuestions(questionsRes.data || []);
+      }
+
+      setLoading(false);
     };
 
-    fetchModuleData();
-  }, [id]); // Dependency array ensures this runs again if the module id changes
+    fetchData();
+  }, [moduleId, toast]);
 
-  /**
-   * Handles marking the module as complete after the user finishes the quiz.
-   * This function is passed as a prop to the ModuleQuiz component.
-   */
-  const handleModuleComplete = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+  const handleMarkComplete = async () => {
+    if (!moduleId) return;
 
-    // Insert or update the user's progress in the 'user_progress' table
-    const { error } = await supabase.from("user_progress").upsert({
-      user_id: user.id,
-      module_id: id,
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+
+    const userId = userData.user.id;
+
+    const { error } = await supabase.from("userprogress").upsert({
+      userid: userId,
+      moduleid: moduleId,
       completed: true,
       progress_percentage: 100,
       completed_at: new Date().toISOString(),
     });
 
-    // If there's an error, show a destructive toast notification
     if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark module as complete",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // On success, redirect the user back to the modules list after a short delay
-    setTimeout(() => {
+      toast({ title: "Error", description: "Failed to update progress", variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Module marked complete!" });
       navigate("/modules");
-    }, 1500);
+    }
   };
 
-  // Display a loading message while data is being fetched
-  if (loading || !module) {
-    return <div className="p-6">Loading...</div>;
-  }
+  if (loading) return <div className="p-6 text-center">Loading module...</div>;
 
-  // Render the component's UI
+  if (!module) return <div className="p-6 text-center">Module not found</div>;
+
+  const hasQuiz = questions.length > 0;
+  const isCompleted = progress?.completed;
+
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      {/* Back button to navigate to the main modules page */}
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
       <Button variant="ghost" onClick={() => navigate("/modules")}>
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Modules
       </Button>
 
-      <Card className="shadow-elevated">
+      <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <CardTitle className="text-2xl mb-2">{module.title}</CardTitle>
-              <CardDescription className="text-base">{module.description}</CardDescription>
-            </div>
-            {/* Show a checkmark if the module is completed */}
-            {progress?.completed && <CheckCircle2 className="h-8 w-8 text-success flex-shrink-0" />}
-          </div>
-
-          <div className="flex items-center gap-4 pt-4">
-            <Badge>{module.category}</Badge>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{module.duration_minutes} minutes</span>
-            </div>
-          </div>
-
-          {/* Display progress bar if the module is in progress */}
-          {progress && !progress.completed && (
-            <div className="space-y-2 pt-4">
-              <div className="flex items-center justify-between text-sm">
-                <span>Your Progress</span>
-                <span className="font-medium">{progress.progress_percentage}%</span>
-              </div>
-              <Progress value={progress.progress_percentage} className="h-2" />
+          <CardTitle>{module.title}</CardTitle>
+          <CardDescription>{module.description}</CardDescription>
+          {progress && (
+            <div className="flex items-center gap-3 mt-1">
+              {isCompleted ? (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Completed
+                </Badge>
+              ) : (
+                <>
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <span>{progress.progress_percentage}% Complete</span>
+                </>
+              )}
             </div>
           )}
         </CardHeader>
+        <CardContent>
+          {module.content && <ReactMarkdown>{module.content}</ReactMarkdown>}
 
-        <CardContent className="space-y-6">
-          {/* Render video player if a video URL is available */}
-          {module.video_url && (
-            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-              <video className="w-full h-full object-cover" controls preload="metadata">
-                <source src={module.video_url} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
+          {!isCompleted && hasQuiz && (
+            <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
+          )}
+
+          {!isCompleted && !hasQuiz && (
+            <div className="text-center space-y-4 mt-6">
+              <p>This module does not have a quiz.</p>
+              <Button size="lg" onClick={handleMarkComplete}>
+                Mark as Complete
+              </Button>
             </div>
           )}
 
-          {/* Render module content using ReactMarkdown, or show default text */}
-          {module.content ? (
-            <div className="prose dark:prose-invert max-w-none">
-              <ReactMarkdown>{module.content}</ReactMarkdown>
-            </div>
-          ) : (
-            <div className="prose dark:prose-invert max-w-none">
-              <h3>Learning Objectives</h3>
-              <ul>
-                <li>Understand key concepts and principles</li>
-                <li>Apply knowledge to real-world scenarios</li>
-                <li>Demonstrate competency in practical skills</li>
-                <li>Meet certification requirements</li>
-              </ul>
-              <h3>Course Content</h3>
-              <p>
-                This comprehensive training module covers essential topics required for pharmacy technician
-                certification. Each section is designed to build upon previous knowledge and provide practical,
-                actionable skills you can immediately apply in a pharmacy setting.
-              </p>
-            </div>
-          )}
-
-          {/* Render the quiz if an id exists and the module is not yet completed */}
-          {id && !progress?.completed && <ModuleQuiz moduleId={id} onComplete={handleModuleComplete} />}
-
-          {/* Show a completion message if the module is finished */}
-          {progress?.completed && (
-            <div className="bg-success/10 border border-success p-6 rounded-lg text-center">
-              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-success mb-2">Module Completed</h3>
-              <p className="text-muted-foreground">You have successfully completed this training module.</p>
+          {isCompleted && (
+            <div className="text-center text-success p-4 border border-success rounded mt-6">
+              You have completed this training module.
             </div>
           )}
         </CardContent>
@@ -193,5 +196,4 @@ const ModuleDetail = () => {
   );
 };
 
-// Export the component for use in other parts of the application
 export default ModuleDetail;
