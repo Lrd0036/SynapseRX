@@ -7,6 +7,9 @@ import React, { useEffect, useState, FC, PropsWithChildren } from "react";
 // These are placeholders to ensure the component compiles and runs.
 // In your local environment, you would use your actual imports.
 
+// Mock the useParams hook directly to provide a module ID
+const useParams = () => ({ id: "d2a0a2e4-8b6a-4b2c-9a3a-3e4e6f2c7a2d" });
+
 const mockSupabase = {
   auth: {
     async getUser() {
@@ -242,8 +245,7 @@ type Question = Omit<Database["public"]["Tables"]["questions"]["Row"], "options"
 };
 
 const ModuleDetail: FC = () => {
-  // In a real app, you'd get this from the URL. Hardcoding for this preview.
-  const moduleId = "d2a0a2e4-8b6a-4b2c-9a3a-3e4e6f2c7a2d";
+  const { id: moduleId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
 
