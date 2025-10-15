@@ -40,228 +40,334 @@ const ModuleQuiz: FC<ModuleQuizProps> = ({ questions, openEndedQuestions, module
   const { toast } = useToast();
 
   const multipleChoiceQuestions = questions.filter((q) => q.question_type === "multiple_choice");
-  const totalQuestions = multipleChoiceQuestions.length + openEndedQuestions.length;
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentMCIndex, setCurrentMCIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [mcAnswered, setMcAnswered] = useState<boolean[]>(new Array(multipleChoiceQuestions.length).fill(false));
+  const [mcScore, setMcScore] = useState(0);
+  const [showMCResults, setShowMCResults] = useState(false);
+  
+  const [showOpenEnded, setShowOpenEnded] = useState(false);
+  const [currentOEIndex, setCurrentOEIndex] = useState(0);
   const [openEndedAnswer, setOpenEndedAnswer] = useState("");
-  const [answered, setAnswered] = useState<boolean[]>(new Array(totalQuestions).fill(false));
-  const [score, setScore] = useState(0);
-  const [showResults, setShowResults] = useState(false);
+  const [oeGrades, setOeGrades] = useState<string[]>([]);
+  const [oeFeedback, setOeFeedback] = useState<string[]>([]);
   const [submittingOpenEnded, setSubmittingOpenEnded] = useState(false);
+  const [showFinalResults, setShowFinalResults] = useState(false);
 
-  useEffect(() => {
-    console.log("DEBUG: Quiz questions received", questions);
-  }, [questions]);
-
-  const isOpenEndedQuestion = currentIndex >= multipleChoiceQuestions.length;
-  const currentMCQuestion = !isOpenEndedQuestion ? multipleChoiceQuestions[currentIndex] : null;
-  const currentOpenEndedQuestion = isOpenEndedQuestion 
-    ? openEndedQuestions[currentIndex - multipleChoiceQuestions.length] 
-    : null;
+  const currentMCQuestion = multipleChoiceQuestions[currentMCIndex];
+  const currentOEQuestion = openEndedQuestions[currentOEIndex];
 
   const handleAnswerSelect = (index: number) => {
-    if (!answered[currentIndex]) setSelectedAnswer(index);
+    if (!mcAnswered[currentMCIndex]) setSelectedAnswer(index);
   };
 
-  const handleSubmitAnswer = async () => {
-    if (isOpenEndedQuestion) {
-      // Handle open-ended question
-      if (!openEndedAnswer.trim()) {
-        toast({ title: "Please provide an answer before submitting", variant: "destructive" });
-        return;
-      }
+  const handleSubmitMCAnswer = () => {
+    if (selectedAnswer === null) {
+      toast({ title: "Please select an answer before submitting", variant: "destructive" });
+      return;
+    }
 
-      setSubmittingOpenEnded(true);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("User not authenticated");
+    const correctIndex = currentMCQuestion.options.findIndex((o) => o === currentMCQuestion.correct_answer);
+    const isCorrect = selectedAnswer === correctIndex;
+    if (isCorrect) setMcScore((s) => s + 1);
 
-        // Store the response in the database
-        const { error } = await (supabase as any)
-          .from("open_ended_responses")
-          .insert({
-            user_id: user.id,
-            module_id: moduleId,
-            question_id: currentOpenEndedQuestion!.id,
-            answer: openEndedAnswer,
-          });
+    const newAnswered = [...mcAnswered];
+    newAnswered[currentMCIndex] = true;
+    setMcAnswered(newAnswered);
 
-        if (error) throw error;
-
-        toast({ title: "Response submitted", description: "Your answer will be graded by the pharmacist" });
-
-        const newAnswered = [...answered];
-        newAnswered[currentIndex] = true;
-        setAnswered(newAnswered);
-
-        if (currentIndex + 1 === totalQuestions) {
-          setShowResults(true);
-        } else {
-          setCurrentIndex(currentIndex + 1);
-          setOpenEndedAnswer("");
-        }
-      } catch (error) {
-        console.error("Error submitting open-ended response:", error);
-        toast({ title: "Error", description: "Failed to submit response", variant: "destructive" });
-      } finally {
-        setSubmittingOpenEnded(false);
-      }
+    if (currentMCIndex + 1 === multipleChoiceQuestions.length) {
+      setShowMCResults(true);
     } else {
-      // Handle multiple choice question
-      if (selectedAnswer === null) {
-        toast({ title: "Please select an answer before submitting", variant: "destructive" });
-        return;
-      }
-      const correctIndex = currentMCQuestion!.options.findIndex((o) => o === currentMCQuestion!.correct_answer);
-      const isCorrect = selectedAnswer === correctIndex;
-      if (isCorrect) setScore((s) => s + 1);
+      setCurrentMCIndex(currentMCIndex + 1);
+      setSelectedAnswer(null);
+    }
+  };
 
-      const newAnswered = [...answered];
-      newAnswered[currentIndex] = true;
-      setAnswered(newAnswered);
+  const handleSubmitOpenEndedAnswer = async () => {
+    if (!openEndedAnswer.trim()) {
+      toast({ title: "Please provide an answer before submitting", variant: "destructive" });
+      return;
+    }
 
-      if (currentIndex + 1 === totalQuestions) {
-        setShowResults(true);
+    setSubmittingOpenEnded(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      // Grade with AI
+      const { data: gradeData, error: gradeError } = await supabase.functions.invoke('grade-open-ended', {
+        body: {
+          answer: openEndedAnswer,
+          question: currentOEQuestion.question,
+          goodCriteria: currentOEQuestion.good_answer_criteria,
+          mediumCriteria: currentOEQuestion.medium_answer_criteria,
+          badCriteria: currentOEQuestion.bad_answer_criteria,
+        }
+      });
+
+      if (gradeError) throw gradeError;
+
+      const { grade, feedback } = gradeData;
+
+      // Store the response with AI grade
+      const { error: insertError } = await supabase
+        .from("open_ended_responses")
+        .insert({
+          user_id: user.id,
+          module_id: moduleId,
+          question_id: currentOEQuestion.id,
+          answer: openEndedAnswer,
+          ai_grade: grade,
+          ai_feedback: feedback,
+          graded_at: new Date().toISOString(),
+        });
+
+      if (insertError) throw insertError;
+
+      setOeGrades([...oeGrades, grade]);
+      setOeFeedback([...oeFeedback, feedback]);
+
+      toast({ 
+        title: `Grade: ${grade.toUpperCase()}`, 
+        description: feedback 
+      });
+
+      if (currentOEIndex + 1 === openEndedQuestions.length) {
+        setShowFinalResults(true);
       } else {
-        setCurrentIndex(currentIndex + 1);
-        setSelectedAnswer(null);
+        setCurrentOEIndex(currentOEIndex + 1);
+        setOpenEndedAnswer("");
       }
+    } catch (error) {
+      console.error("Error submitting open-ended response:", error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to grade response", 
+        variant: "destructive" 
+      });
+    } finally {
+      setSubmittingOpenEnded(false);
     }
   };
 
   const handleRetakeQuiz = () => {
-    setCurrentIndex(0);
+    setCurrentMCIndex(0);
     setSelectedAnswer(null);
+    setMcAnswered(new Array(multipleChoiceQuestions.length).fill(false));
+    setMcScore(0);
+    setShowMCResults(false);
+    setShowOpenEnded(false);
+    setCurrentOEIndex(0);
     setOpenEndedAnswer("");
-    setAnswered(new Array(totalQuestions).fill(false));
-    setScore(0);
-    setShowResults(false);
+    setOeGrades([]);
+    setOeFeedback([]);
+    setShowFinalResults(false);
   };
 
-  if (showResults) {
-    const percentage = Math.round((score / multipleChoiceQuestions.length) * 100);
-    const passed = percentage >= 70; // Pass rate is 70%
+  const handleContinueToOpenEnded = () => {
+    setShowMCResults(false);
+    setShowOpenEnded(true);
+  };
+
+  // Final results after both sections
+  if (showFinalResults) {
+    const mcPercentage = Math.round((mcScore / multipleChoiceQuestions.length) * 100);
+    const mcPassed = mcPercentage >= 70;
+    
+    const goodCount = oeGrades.filter(g => g === 'good').length;
+    const oePercentage = openEndedQuestions.length > 0 
+      ? Math.round((goodCount / openEndedQuestions.length) * 100) 
+      : 100;
+    const oePassed = oePercentage >= 70;
+    
+    const overallPassed = mcPassed && oePassed;
+
     return (
       <Card>
         <CardHeader className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
-            <Award className="h-6 w-6 text-primary" /> Quiz Completed!
+            <Award className="h-6 w-6 text-primary" /> Assessment Complete!
           </CardTitle>
-          <Badge variant={passed ? "default" : "destructive"}>{passed ? "Passed" : "Needs Review"}</Badge>
+          <Badge variant={overallPassed ? "default" : "destructive"}>
+            {overallPassed ? "Passed" : "Needs Review"}
+          </Badge>
         </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <div className="text-6xl font-bold text-primary">{percentage}%</div>
-          <p>
-            You scored {score} out of {multipleChoiceQuestions.length} questions correctly.
-          </p>
-          {passed ? (
-            <p className="text-success">Great job! You have demonstrated understanding.</p>
-          ) : (
-            <p className="text-destructive">Please review the module and try again.</p>
-          )}
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Multiple Choice</h3>
+              <div className="text-4xl font-bold text-primary">{mcPercentage}%</div>
+              <p className="text-sm text-muted-foreground">
+                {mcScore} out of {multipleChoiceQuestions.length} correct
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-2">Short Answer Questions</h3>
+              <div className="text-4xl font-bold text-primary">{oePercentage}%</div>
+              <p className="text-sm text-muted-foreground">
+                {goodCount} good, {oeGrades.filter(g => g === 'medium').length} medium, {oeGrades.filter(g => g === 'bad').length} needs improvement
+              </p>
+            </div>
+          </div>
 
-          {/* CONDITIONAL BUTTON LOGIC ADDED HERE */}
-          {passed ? (
-            <Button className="w-full" size="lg" onClick={onComplete}>
-              Finalize Module & Continue
-            </Button>
+          {overallPassed ? (
+            <>
+              <p className="text-center text-success">
+                Excellent work! You've demonstrated comprehensive understanding.
+              </p>
+              <Button className="w-full" size="lg" onClick={onComplete}>
+                Complete Module & Continue
+              </Button>
+            </>
           ) : (
-            <Button className="w-full" size="lg" onClick={handleRetakeQuiz}>
-              Retake Quiz
-            </Button>
+            <>
+              <p className="text-center text-destructive">
+                Please review the material and retake the assessment.
+              </p>
+              <Button className="w-full" size="lg" onClick={handleRetakeQuiz}>
+                Retake Assessment
+              </Button>
+            </>
           )}
-          {/* END CONDITIONAL BUTTON LOGIC */}
         </CardContent>
       </Card>
     );
   }
 
-  if (totalQuestions === 0) {
-    return <div className="p-4 text-center text-muted">No assessment quiz available.</div>;
+  // MC Results - intermediate screen
+  if (showMCResults) {
+    const percentage = Math.round((mcScore / multipleChoiceQuestions.length) * 100);
+    const passed = percentage >= 70;
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Multiple Choice Results
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <div className="text-6xl font-bold text-primary">{percentage}%</div>
+          <p>
+            You scored {mcScore} out of {multipleChoiceQuestions.length} questions correctly.
+          </p>
+          
+          {passed && openEndedQuestions.length > 0 ? (
+            <>
+              <p className="text-success">Great! Now let's move to the short answer questions.</p>
+              <Button className="w-full" size="lg" onClick={handleContinueToOpenEnded}>
+                Continue to Short Answer Questions
+              </Button>
+            </>
+          ) : passed && openEndedQuestions.length === 0 ? (
+            <>
+              <p className="text-success">Perfect! You've completed this module.</p>
+              <Button className="w-full" size="lg" onClick={onComplete}>
+                Complete Module
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-destructive">
+                You need 70% or higher to proceed. Please review and try again.
+              </p>
+              <Button className="w-full" size="lg" onClick={handleRetakeQuiz}>
+                Retake Quiz
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
 
+  if (multipleChoiceQuestions.length === 0 && openEndedQuestions.length === 0) {
+    return <div className="p-4 text-center text-muted">No assessment available.</div>;
+  }
+
+  // Open-ended questions section
+  if (showOpenEnded) {
+    return (
+      <Card>
+        <CardHeader className="flex justify-between items-center">
+          <CardTitle>Short Answer Questions</CardTitle>
+          <Badge variant="outline">
+            Question {currentOEIndex + 1} of {openEndedQuestions.length}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <h3 className="mb-4 font-semibold">{currentOEQuestion.question}</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Provide a detailed answer. Your response will be graded immediately by AI.
+          </p>
+          <Textarea
+            value={openEndedAnswer}
+            onChange={(e) => setOpenEndedAnswer(e.target.value)}
+            placeholder="Type your answer here..."
+            className="min-h-[150px] mb-4"
+            disabled={submittingOpenEnded}
+          />
+          <Button 
+            size="lg" 
+            className="w-full" 
+            onClick={handleSubmitOpenEndedAnswer} 
+            disabled={!openEndedAnswer.trim() || submittingOpenEnded}
+          >
+            {submittingOpenEnded ? "Grading..." : "Submit Answer"}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Multiple choice quiz
   return (
     <Card>
       <CardHeader className="flex justify-between items-center">
-        <CardTitle>Assessment Quiz</CardTitle>
+        <CardTitle>Multiple Choice Quiz</CardTitle>
         <Badge variant="outline">
-          Question {currentIndex + 1} of {totalQuestions}
+          Question {currentMCIndex + 1} of {multipleChoiceQuestions.length}
         </Badge>
       </CardHeader>
       <CardContent>
-        {isOpenEndedQuestion ? (
-          // Open-ended question
-          <>
-            <div className="mb-2">
-              <Badge variant="secondary">Open-Ended Question</Badge>
-            </div>
-            <h3 className="mb-4 font-semibold">{currentOpenEndedQuestion!.question}</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Provide a detailed answer. Your response will be graded by a pharmacist.
-            </p>
-            <Textarea
-              value={openEndedAnswer}
-              onChange={(e) => setOpenEndedAnswer(e.target.value)}
-              placeholder="Type your answer here..."
-              className="min-h-[150px] mb-4"
-              disabled={answered[currentIndex]}
-            />
-            {!answered[currentIndex] && (
-              <Button 
-                size="lg" 
-                className="w-full" 
-                onClick={handleSubmitAnswer} 
-                disabled={!openEndedAnswer.trim() || submittingOpenEnded}
+        <h3 className="mb-4 font-semibold">{currentMCQuestion.question_text}</h3>
+        <RadioGroup
+          value={selectedAnswer !== null ? selectedAnswer.toString() : ""}
+          onValueChange={(val) => handleAnswerSelect(parseInt(val))}
+          disabled={mcAnswered[currentMCIndex]}
+        >
+          {currentMCQuestion.options.map((option, idx) => {
+            const correctIndex = currentMCQuestion.options.findIndex((o) => o === currentMCQuestion.correct_answer);
+            const isAnswered = mcAnswered[currentMCIndex];
+            return (
+              <div
+                key={idx}
+                className={`flex items-center gap-2 mb-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  isAnswered
+                    ? idx === correctIndex
+                      ? "bg-green-100 border-green-500"
+                      : selectedAnswer === idx
+                        ? "bg-red-100 border-red-500"
+                        : "border-gray-300"
+                    : "border-gray-300 hover:border-blue-500"
+                }`}
               >
-                {submittingOpenEnded ? "Submitting..." : "Submit Answer"}
-              </Button>
-            )}
-          </>
-        ) : (
-          // Multiple choice question
-          <>
-            <div className="mb-2">
-              <Badge variant="secondary">Multiple Choice</Badge>
-            </div>
-            <h3 className="mb-4 font-semibold">{currentMCQuestion!.question_text}</h3>
-            <RadioGroup
-              value={selectedAnswer !== null ? selectedAnswer.toString() : ""}
-              onValueChange={(val) => handleAnswerSelect(parseInt(val))}
-              disabled={answered[currentIndex]}
-            >
-              {currentMCQuestion!.options.map((option, idx) => {
-                const correctIndex = currentMCQuestion!.options.findIndex((o) => o === currentMCQuestion!.correct_answer);
-                const isAnswered = answered[currentIndex];
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-2 mb-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      isAnswered
-                        ? idx === correctIndex
-                          ? "bg-green-100 border-green-500"
-                          : selectedAnswer === idx
-                            ? "bg-red-100 border-red-500"
-                            : "border-gray-300"
-                        : "border-gray-300 hover:border-blue-500"
-                    }`}
-                  >
-                    <RadioGroupItem id={`option-${idx}`} value={idx.toString()} />
-                    <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer">
-                      {option}
-                    </Label>
-                    {isAnswered && idx === correctIndex && <CheckCircle2 className="text-green-500" />}
-                    {isAnswered && selectedAnswer === idx && idx !== correctIndex && <XCircle className="text-red-500" />}
-                  </div>
-                );
-              })}
-            </RadioGroup>
-            {!answered[currentIndex] && (
-              <Button size="lg" className="w-full" onClick={handleSubmitAnswer} disabled={selectedAnswer === null}>
-                Submit Answer
-              </Button>
-            )}
-          </>
+                <RadioGroupItem id={`option-${idx}`} value={idx.toString()} />
+                <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer">
+                  {option}
+                </Label>
+                {isAnswered && idx === correctIndex && <CheckCircle2 className="text-green-500" />}
+                {isAnswered && selectedAnswer === idx && idx !== correctIndex && <XCircle className="text-red-500" />}
+              </div>
+            );
+          })}
+        </RadioGroup>
+        {!mcAnswered[currentMCIndex] && (
+          <Button size="lg" className="w-full" onClick={handleSubmitMCAnswer} disabled={selectedAnswer === null}>
+            Submit Answer
+          </Button>
         )}
       </CardContent>
     </Card>
