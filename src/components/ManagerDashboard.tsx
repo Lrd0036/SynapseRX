@@ -176,31 +176,38 @@ export const ManagerDashboard = () => {
       // Calculate module-specific statistics
       const moduleStatistics = (modules || []).map((module) => {
         const moduleProgress = allProgress?.filter((p) => p.module_id === module.id) || [];
-        const completionRate = moduleProgress.length > 0
-          ? Math.round((moduleProgress.filter((p) => p.completed).length / (profiles?.length || 1)) * 100)
-          : 0;
-
-        // Find competencies related to this module
-        const moduleCompetencies = competencies?.filter((c) => 
-          c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(' ')[0]) ||
-          c.competency_name.toLowerCase().includes(module.title.toLowerCase().split(' ')[1] || '')
-        ) || [];
+        const usersStarted = moduleProgress.length;
+        const usersCompleted = moduleProgress.filter((p) => p.completed).length;
         
-        const avgModuleScore = moduleCompetencies.length > 0
-          ? Math.round(moduleCompetencies.reduce((sum, c) => sum + c.score, 0) / moduleCompetencies.length)
+        // Calculate completion rate (% of total users who completed this module)
+        const completionRate = profiles?.length > 0
+          ? Math.round((usersCompleted / profiles.length) * 100)
           : 0;
 
-        const passRate = moduleCompetencies.length > 0
-          ? Math.round((moduleCompetencies.filter((c) => c.score >= 70).length / moduleCompetencies.length) * 100)
+        // Calculate average progress for users who started
+        const avgProgress = usersStarted > 0
+          ? Math.round(moduleProgress.reduce((sum, p) => sum + p.progress_percentage, 0) / usersStarted)
           : 0;
+
+        // Calculate pass rate using user metrics accuracy for users who engaged with this module
+        const moduleUserIds = moduleProgress.map(p => p.user_id);
+        const relevantMetrics = metrics?.filter(m => moduleUserIds.includes(m.user_id)) || [];
+        
+        const avgScore = relevantMetrics.length > 0
+          ? Math.round(relevantMetrics.reduce((sum, m) => sum + Number(m.accuracy_rate || 0), 0) / relevantMetrics.length)
+          : avgProgress; // Fallback to progress if no metrics
+        
+        const passRate = relevantMetrics.length > 0
+          ? Math.round((relevantMetrics.filter(m => Number(m.accuracy_rate || 0) >= 70).length / relevantMetrics.length) * 100)
+          : (avgProgress >= 70 ? Math.round(usersCompleted / Math.max(usersStarted, 1) * 100) : 0);
 
         return {
           module_id: module.id,
           module_title: module.title,
           completion_rate: completionRate,
-          avg_score: avgModuleScore,
+          avg_score: avgScore,
           pass_rate: passRate,
-          is_gap: completionRate < 60 || avgModuleScore < 60,
+          is_gap: completionRate < 60 || avgScore < 60,
         };
       });
 
