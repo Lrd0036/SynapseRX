@@ -84,7 +84,7 @@ const ModuleQuiz: FC<ModuleQuizProps> = ({ questions, openEndedQuestions, module
             user_id: user.id,
             module_id: moduleId,
             question_id: currentOpenEndedQuestion!.id,
-            response_text: openEndedAnswer,
+            answer: openEndedAnswer,
           });
 
         if (error) throw error;
