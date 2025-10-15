@@ -23,7 +23,7 @@ interface QuizQuestion {
 interface OpenEndedQuestion {
   id: string;
   module_id: string;
-  question_text: string;
+  question: string;
   good_answer_criteria: string;
   medium_answer_criteria: string;
   bad_answer_criteria: string;
@@ -196,7 +196,7 @@ const ModuleQuiz: FC<ModuleQuizProps> = ({ questions, openEndedQuestions, module
             <div className="mb-2">
               <Badge variant="secondary">Open-Ended Question</Badge>
             </div>
-            <h3 className="mb-4 font-semibold">{currentOpenEndedQuestion!.question_text}</h3>
+            <h3 className="mb-4 font-semibold">{currentOpenEndedQuestion!.question}</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Provide a detailed answer. Your response will be graded by a pharmacist.
             </p>

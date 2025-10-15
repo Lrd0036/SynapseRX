@@ -42,7 +42,7 @@ interface QuizQuestion {
 interface OpenEndedQuestion {
   id: string;
   module_id: string;
-  question_text: string;
+  question: string;
   good_answer_criteria: string;
   medium_answer_criteria: string;
   bad_answer_criteria: string;
