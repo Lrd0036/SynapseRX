@@ -39,6 +39,15 @@ interface QuizQuestion {
   created_at: string;
 }
 
+interface OpenEndedQuestion {
+  id: string;
+  module_id: string;
+  question_text: string;
+  good_answer_criteria: string;
+  medium_answer_criteria: string;
+  bad_answer_criteria: string;
+}
+
 const ModuleDetail: FC = () => {
   // Use useParams to correctly get the module ID from the URL
   const { id: moduleId } = useParams<{ id: string }>();
@@ -48,6 +57,7 @@ const ModuleDetail: FC = () => {
   const [module, setModule] = useState<Module | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [openEndedQuestions, setOpenEndedQuestions] = useState<OpenEndedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [markdownContent, setMarkdownContent] = useState<string>("");
   const [readyForQuiz, setReadyForQuiz] = useState(false);
@@ -142,6 +152,20 @@ const ModuleDetail: FC = () => {
           }));
           setQuestions(parsedQuestions);
         }
+
+        // Fetch Open-ended Questions
+        const { data: openEndedData, error: openEndedError } = await (supabase as any)
+          .from("open_ended_questions")
+          .select("*")
+          .eq("module_id", moduleId)
+          .order("created_at", { ascending: true });
+
+        if (openEndedError) {
+          console.error("Error fetching open-ended questions:", openEndedError);
+          setOpenEndedQuestions([]);
+        } else {
+          setOpenEndedQuestions(openEndedData || []);
+        }
       } catch (error) {
         console.error("Error fetching module data:", error);
         toast({
@@ -202,7 +226,7 @@ const ModuleDetail: FC = () => {
   if (loading) return <div className="p-6 text-center">Loading module...</div>;
   if (!module) return <div className="p-6 text-center">Module not found.</div>;
 
-  const hasQuiz = questions.length > 0;
+  const hasQuiz = questions.length > 0 || openEndedQuestions.length > 0;
   const isCompleted = progress?.completed;
 
   return (
@@ -257,7 +281,12 @@ const ModuleDetail: FC = () => {
           )}
 
           {!isCompleted && hasQuiz && readyForQuiz && (
-            <ModuleQuiz questions={questions} moduleId={module.id} onComplete={handleMarkComplete} />
+            <ModuleQuiz 
+              questions={questions} 
+              openEndedQuestions={openEndedQuestions}
+              moduleId={module.id} 
+              onComplete={handleMarkComplete} 
+            />
           )}
 
           {!isCompleted && !hasQuiz && (
