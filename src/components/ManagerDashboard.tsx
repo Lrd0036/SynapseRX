@@ -500,12 +500,12 @@ export const ManagerDashboard = () => {
         {/* Module Performance Bar Chart */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Module Pass Rates & Scores</CardTitle>
-            <CardDescription>Completion and competency breakdown by module</CardDescription>
+            <CardTitle>Module 1 & 2 Completion Rates</CardTitle>
+            <CardDescription>Completion rate for the first two modules</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={moduleStats}>
+              <BarChart data={moduleStats.slice(0, 2)}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="module_title" 
@@ -517,14 +517,13 @@ export const ManagerDashboard = () => {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="pass_rate" fill="hsl(var(--primary))" name="Pass Rate %" />
-                <Bar dataKey="avg_score" fill="hsl(var(--success))" name="Avg Score %" />
+                <Bar dataKey="completion_rate" fill="hsl(var(--primary))" name="Completion Rate %" />
               </BarChart>
             </ResponsiveContainer>
-            {moduleStats.some((m) => m.avg_score < 60) && (
+            {moduleStats.slice(0, 2).some((m) => m.completion_rate < 50) && (
               <div className="mt-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg">
                 <p className="text-sm font-medium text-destructive">
-                  ⚠️ Regulatory Compliance shows critically low performance (avg. 39%, pass rate 42%)
+                  ⚠️ Low completion rates detected for initial modules
                 </p>
               </div>
             )}
