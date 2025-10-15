@@ -76,9 +76,10 @@ serve(async (req) => {
           // If creation fails because the user already exists, treat it as an update path.
           if (createError.message.includes("already been registered")) {
             const {
-              data: { user: existingUser },
+              data: { users },
               error: getUserError,
-            } = await supabaseAdmin.auth.admin.getUserByEmail(Email);
+            } = await supabaseAdmin.auth.admin.listUsers();
+            const existingUser = users?.find(u => u.email === Email);
 
             if (getUserError) throw new Error(`Failed to retrieve existing user ${Email}: ${getUserError.message}`);
             if (!existingUser) throw new Error(`Could not find user ${Email} after creation conflict.`);
