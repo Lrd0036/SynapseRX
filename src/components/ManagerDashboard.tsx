@@ -143,9 +143,20 @@ export const ManagerDashboard = () => {
         const userCompetencies = competencies?.filter((c) => c.user_id === profile.id) || [];
         const userMetric = (metrics || []).find((m) => m.user_id === profile.id);
 
-        const completed = userProgress.filter((p) => p.completed).length;
-        const inProgress = userProgress.filter((p) => !p.completed && p.progress_percentage > 0).length;
         const total = modules?.length || 0;
+        
+        // Use ProgressPercent from user_metrics first, fallback to calculated
+        const completionPercentage = userMetric?.progress_percent || 
+          (total > 0 && userProgress.length > 0 
+            ? Math.round((userProgress.filter((p) => p.completed).length / total) * 100) 
+            : 0);
+        
+        // Calculate completed modules from completion percentage
+        const completed = total > 0 
+          ? Math.round((completionPercentage / 100) * total)
+          : 0;
+        
+        const inProgress = userProgress.filter((p) => !p.completed && p.progress_percentage > 0).length;
         
         // Use AccuracyRate from user_metrics, fallback to competency average
         const avgScore = userMetric?.accuracy_rate 
@@ -153,10 +164,6 @@ export const ManagerDashboard = () => {
           : userCompetencies.length
           ? Math.round(userCompetencies.reduce((sum, c) => sum + c.score, 0) / userCompetencies.length)
           : 0;
-        
-        // Use ProgressPercent from user_metrics
-        const completionPercentage = userMetric?.progress_percent || 
-          (total > 0 ? Math.round((completed / total) * 100) : 0);
 
         return {
           id: profile.id,
