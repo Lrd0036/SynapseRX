@@ -87,17 +87,24 @@ const Consultation = () => {
       return;
     }
 
+    const userMessage = input;
     setInput("");
 
-    // Simulate AI response
-    setTimeout(async () => {
-      await supabase.from("consultation_messages").insert({
-        user_id: user.id,
-        message: "Thank you for your question. A pharmacy expert will respond shortly with detailed guidance.",
-        is_ai_response: true,
+    // Call AI consultation edge function
+    const { data, error: aiError } = await supabase.functions.invoke('consultation-chat', {
+      body: { message: userMessage }
+    });
+
+    if (aiError) {
+      console.error('AI consultation error:', aiError);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
       });
-      setLoading(false);
-    }, 1000);
+    }
+
+    setLoading(false);
   };
 
   return (
