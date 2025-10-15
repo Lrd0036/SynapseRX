@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, User, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   id: string;
@@ -142,7 +143,9 @@ const Consultation = () => {
                         : "bg-primary text-primary-foreground"
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                    <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown>{msg.message}</ReactMarkdown>
+                    </div>
                     <p className="text-xs opacity-70 mt-1">
                       {new Date(msg.created_at).toLocaleTimeString()}
                     </p>
