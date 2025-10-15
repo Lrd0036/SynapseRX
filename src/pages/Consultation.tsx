@@ -91,7 +91,7 @@ const Consultation = () => {
     setInput("");
 
     // Call AI consultation edge function
-    const { data, error: aiError } = await supabase.functions.invoke('Consultation-chat', {
+    const { data, error: aiError } = await supabase.functions.invoke('consultation-chat', {
       body: { message: userMessage }
     });
 
