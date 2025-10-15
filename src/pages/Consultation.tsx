@@ -110,15 +110,15 @@ const Consultation = () => {
   return (
     <div className="p-6 max-w-4xl mx-auto h-[calc(100vh-8rem)]">
       <Card className="shadow-elevated h-full flex flex-col">
-        <CardHeader>
+        <CardHeader className="flex-shrink-0">
           <CardTitle>Consultation Chat</CardTitle>
           <CardDescription>
             Ask questions and get expert pharmacy guidance
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col p-0">
+        <CardContent className="flex-1 flex flex-col p-0 min-h-0">
           <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
+            <div className="space-y-4 pb-4">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -142,7 +142,7 @@ const Consultation = () => {
                         : "bg-primary text-primary-foreground"
                     }`}
                   >
-                    <p className="text-sm">{msg.message}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                     <p className="text-xs opacity-70 mt-1">
                       {new Date(msg.created_at).toLocaleTimeString()}
                     </p>
@@ -153,7 +153,7 @@ const Consultation = () => {
             </div>
           </ScrollArea>
 
-          <div className="border-t p-4">
+          <div className="border-t p-4 flex-shrink-0">
             <div className="flex gap-2">
               <Input
                 placeholder="Type your question..."
