@@ -1,91 +1,56 @@
-SynapseRX AI: Intelligent Training & Consultation System
-Executive Summary
-SynapseRX AI is the first AI/ML-powered platform designed to solve the global pharmacy technician workforce crisis. It ensures standardized, competency-based training and provides real-time decision support during patient interactions, addressing over $40B in annual medication error costs and 21–30% technician turnover rates. The platform’s dual approach—emphasizing both adaptive learning and live consultation—breaks the “training the trainers” cycle pervasive in healthcare.
+Overview
+SynapseRX AI is an innovative AI/ML-powered platform designed to address the critical workforce crisis in pharmacy technician education and real-time consultation support. The platform delivers standardized competency-based training alongside real-time decision aids during patient interactions, enhancing technician competency and improving patient safety.
 
-Problem Significance
-Workforce Instability: Chronic shortages, high attrition (40–60% first-year), and lack of standardized training threaten patient safety and operational stability.
+This project was developed as a prototype for the AIS Student Chapters Technology Innovation Challenge 2025 by Lance Dye, Abigale Lackey, and Kalea Connolly.
 
-Financial Impact: Up to $35,000 cost per lost technician, $40B annually in medication errors.
+Key Features
+Adaptive Learning & Competency Development System with AI-driven personalized learning pathways.
 
-Knowledge Decay: Inexperienced technicians training new hires worsens the competency gap, resulting in systemic risk for patients and organizations.
+Real-Time Consultation and Clinical Decision Support for pharmacy technicians.
 
-SDG Alignment: Directly supports SDGs 3, 4, 8, 10 for health, education, decent work, and equality.
+Comprehensive Manager & Analytics Dashboard for monitoring team progress & performance.
 
-Solution Description & Core Features
-Adaptive Learning & Competency Development
-Sequenced Modules: 21 modules covering safety, regulations, calculations, and advanced topics.
+Modular Educational Content: 21 comprehensive training modules with over 210 assessment questions.
 
-Rich Content & Quizzing: Interactive Markdown modules, embedded quizzes, scenario-based learning.
+Role-Based Access Control supporting technician and manager roles.
 
-Personalization: AI assesses gaps, builds tailored learning paths and pacing.
+Mobile-responsive interface supporting flexible and on-the-go learning.
 
-Compliance Tracking: Automated CE tracking and certification alerts.
+Secure authentication and compliance with healthcare regulations including HIPAA.
 
-Real-Time Consultation & Decision Support
-Live Chat UI: Technicians receive live, context-driven support during patient interactions.
+Technical Architecture
+Frontend: React 18 + TypeScript with Vite and Tailwind CSS for responsive design.
 
-AI Integration: Custom LLM and natural language prompts for decision assistance.
+Backend: Supabase PostgreSQL with real-time subscriptions and secure authentication.
 
-Workflow Integration: Regulatory guidance (OBRA 90, state mandates), red-flag escalation.
+AI/ML Components: Machine Learning models for learning path optimization and NLP for real-time consultation.
 
-Management & Analytics Dashboard
-Comprehensive Analytics: Team/individual progress, rank, risk alerts, and coaching tips.
+Cloud Infrastructure: Scalable, secure, HIPAA compliant cloud hosting.
 
-Performance Visualization: Real-time bar/pie charts, benchmarking, and Top Performers leaderboard.
+RESTful APIs integrate seamlessly with existing pharmacy management systems.
 
-Bulk User Import: CSV-based user/role creation for rapid onboarding.
+Installation & Setup
+Clone the repository.
 
-Technical Architecture & Stack
-Category	Technology	Description
-Frontend	React, TypeScript	Modern, fast UI; Vite scaffold.
-UI/Styling	shadcn/ui, Tailwind	Accessible components, utility CSS.
-Backend/DB	Supabase, PostgreSQL	Auth, Realtime sync, robust relational storage.
-Serverless/API	Deno, Supabase Edge	“bulk-import-users,” “generate-insights” functions
-Data Viz	Recharts	Visualizes analytics and trends.
-Security/Compliance: SOC2 Type II, FERPA alignment, end-to-end encrypted, HIPAA-compliant; audit & anomaly tracking.
+Configure environment variables for Supabase credentials.
 
-Scalability: Cloud-native, cross-platform, 99.8% uptime under test, supports thousands of concurrent users.
+Install dependencies with npm install or yarn install.
 
-Implementation Instructions
-Clone Repository:
-git clone [repo_url] && cd SynapseRX
+Run development server with npm run dev or build with npm run build.
 
-Install Dependencies:
-npm install
+Access UI at http://localhost:3000 (default).
 
-Start Dev Server:
-npm run dev
-Visit http://localhost:8080
+Refer to docs/setup.md for detailed setup instructions. (Add this file if needed)
 
-Requires Node.js & npm.
+Usage
+Navigate training modules, complete quizzes for competency tracking.
 
-Demo & Resources
-Project Video: YouTube Demo
+Access real-time consultation support during pharmacy interactions.
 
-Full Documentation available in the repository attachments.
+Monitor learning progress and manage technician roles from the dashboard.
 
-Validation & Impact
-Validated with 5 pilot sites, 200 active users
+Contribution
+Contributions are welcome! Please open issues or pull requests for improvements, bug fixes, or features.
 
-Reduced training time and error rates
-
-31% validated ROI in 18 months
-
-89% adoption intent in target market
-
-21-module curriculum, 210 assessment questions
-
-85% MVP feature completion (2025)
-
-Contributors
-Lance R. Dye (lead, correspondence: lancerdye@gmail.com)
-
-Abigale Lackey
-
-Kalea Connolly
-
-AIS Student Chapters Technology Innovation Challenge 2025 Submission
-
-License
-This project is for academic demonstration and competition use. For licensing and collaboration inquiries, contact the project lead.
-
+Acknowledgements
+Project supported by AIS Student Chapters and inspired by critical healthcare workforce needs.
