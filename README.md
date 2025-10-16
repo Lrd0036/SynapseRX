@@ -56,16 +56,7 @@ The only requirement is having Node.js & npm installed.
     ```sh
     npm install
     ```
-
-3.  **Configure Environment Variables:**
-    Create a `.env.local` file based on the provided `.env`. You must also configure your Supabase project's `SUPABASE_SERVICE_ROLE_KEY` in the appropriate environment (e.g., Vercel, Supabase dashboard) for the Edge Functions to work correctly.
-    ```env
-    VITE_SUPABASE_PROJECT_ID="kvfldjqgisgilvtsyser"
-    VITE_SUPABASE_PUBLISHABLE_KEY="..."
-    VITE_SUPABASE_URL="[https://kvfldjqgisgilvtsyser.supabase.co](https://kvfldjqgisgilvtsyser.supabase.co)"
-    # Note: SUPABASE_SERVICE_ROLE_KEY is required for Edge Functions
-    # but should not be committed to the repo or included in VITE_*.
-    ```
+3.
 
 4.  **Start the development server:**
     ```sh
